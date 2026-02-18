@@ -230,7 +230,7 @@ export function WorkspaceCanvas({
   }, []);
 
   return (
-    <div style={{ display: "flex", flex: 1, minHeight: 0, overflow: "hidden", position: "relative" }}>
+    <div style={{ display: "flex", flex: 1, minHeight: 0, height: "100%", overflow: "hidden", position: "relative" }}>
       {isNarrowViewport && (!isLeftSidebarCollapsed || !isInspectorCollapsed) && (
         <button
           type="button"
@@ -337,6 +337,7 @@ export function WorkspaceCanvas({
             bottom: isNarrowViewport ? 0 : undefined,
             display: "flex",
             height: isNarrowViewport ? undefined : "100%",
+            maxHeight: isNarrowViewport ? undefined : "100%",
             minHeight: 0,
             zIndex: isNarrowViewport ? 26 : 20,
           }}
@@ -365,6 +366,14 @@ export function WorkspaceCanvas({
           </button>
 
           <aside
+            onWheel={(e) => {
+              // Prevent canvas zoom while scrolling sidebar, but allow native scroll
+              const target = e.currentTarget;
+              const isScrollable = target.scrollHeight > target.clientHeight;
+              if (isScrollable) {
+                e.stopPropagation();
+              }
+            }}
             style={{
               width: leftSidebarWidth,
               flexShrink: 0,
@@ -382,6 +391,8 @@ export function WorkspaceCanvas({
               gap: 12,
               overflowY: "auto",
               overflowX: "hidden",
+              scrollBehavior: "smooth",
+              scrollbarGutter: "stable",
               overscrollBehaviorY: "contain",
               WebkitOverflowScrolling: "touch",
             }}

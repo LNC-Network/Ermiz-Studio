@@ -293,6 +293,7 @@ const infraFieldSets: Record<
 export function PropertyInspector({ width = 320 }: { width?: number }) {
   const {
     nodes,
+    edges,
     activeTab,
     graphs,
     updateNodeData,
@@ -305,6 +306,7 @@ export function PropertyInspector({ width = 320 }: { width?: number }) {
   } = useStore(
     useShallow((state) => ({
       nodes: state.nodes,
+      edges: state.edges,
       activeTab: state.activeTab,
       graphs: state.graphs,
       updateNodeData: state.updateNodeData,

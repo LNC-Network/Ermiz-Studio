@@ -677,7 +677,7 @@ export default function Home() {
         </div>
       </header>
 
-      <div style={{ display: "flex", flex: 1, minHeight: 0, overflow: "hidden" }}>
+      <div style={{ display: "flex", flex: 1, minHeight: 0, height: "100%", overflow: "hidden" }}>
         {activeTab === "agent" ? (
           <AgentWorkspace />
         ) : activeTab === "deploy" ? (
