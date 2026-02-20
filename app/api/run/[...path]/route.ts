@@ -51,7 +51,7 @@ async function handleRequest(req: NextRequest, ctx: RouteContext) {
   }
 
   const engine = new RuntimeEngine(activeGraphs);
-  const flowResult = engine.executeRestRequest({
+  const flowResult = await engine.executeRestRequest({
     method: req.method,
     path: runtimePath,
     payload,

@@ -3,6 +3,7 @@ import {
   DatabaseBlock,
   DatabaseBlockSchema,
   NodeData,
+  ProcessDefinition,
 } from "@/lib/schema/node";
 import { PrismaClient } from "@prisma/client";
 
@@ -33,6 +34,11 @@ export type RuntimeFlowResult = {
     status: number;
     body: Record<string, unknown>;
   };
+};
+
+type RuntimeProcessContext = {
+  input?: unknown;
+  output?: Record<string, unknown>;
 };
 
 type RuntimeStartOptions = {
@@ -126,6 +132,7 @@ export class RuntimeEngine {
   public async start(options?: RuntimeStartOptions): Promise<RuntimeExecutionNode[]> {
     const { nodes, edges } = this.collectGraphData();
     const sortedNodes = this.topologicalSort(nodes, edges);
+    const databaseByReference = this.createDatabaseReferenceMap(sortedNodes);
     const executionOrder = sortedNodes.map((node) => ({
       id: node.id,
       kind: node.data.kind,
@@ -141,7 +148,7 @@ export class RuntimeEngine {
     for (const [index, node] of executionOrder.entries()) {
       console.log(`[RuntimeEngine] Executing ${node.kind}:${node.id}`);
       options?.onExecute?.(node, index, executionOrder.length);
-      await this.executeNode(sortedNodes[index]);
+      await this.executeNode(sortedNodes[index], { input: undefined }, databaseByReference);
     }
 
     return executionOrder;
@@ -160,7 +167,10 @@ export class RuntimeEngine {
       if (api.kind !== "api_binding") continue;
       if (api.protocol !== "rest") continue;
 
-      const isRestBlock = node.type === "api_rest" || node.type === "api_binding";
+      const isRestBlock =
+        node.type === undefined ||
+        node.type === "api_rest" ||
+        node.type === "api_binding";
       if (!isRestBlock) continue;
 
       const route = (api.route || "").trim();
@@ -180,17 +190,20 @@ export class RuntimeEngine {
     return null;
   }
 
-  public executeRestRequest(params: {
+  public async executeRestRequest(params: {
     method: string;
     path: string;
     payload?: unknown;
-  }): RuntimeFlowResult | null {
+  }): Promise<RuntimeFlowResult | null> {
     const apiNode = this.findRestApiNode(params.method, params.path);
     if (!apiNode) return null;
     return this.executeFromApiNode(apiNode.id, params.payload);
   }
 
-  public executeFromApiNode(apiNodeId: string, payload?: unknown): RuntimeFlowResult {
+  public async executeFromApiNode(
+    apiNodeId: string,
+    payload?: unknown,
+  ): Promise<RuntimeFlowResult> {
     const { nodes, edges } = this.collectGraphData();
     const nodeById = new Map(nodes.map((node) => [node.id, node]));
     const adjacency = new Map<string, Set<string>>();
@@ -237,6 +250,26 @@ export class RuntimeEngine {
       throw new Error(`API node "${apiNodeId}" is invalid or missing`);
     }
 
+    const processContext: RuntimeProcessContext = { input: payload };
+    const databaseByReference = this.createDatabaseReferenceMap(nodes);
+
+    for (const node of ordered) {
+      console.log(`[RuntimeEngine] Executing ${node.data.kind}:${node.id}`);
+      if (node.data.kind === "process") {
+        const output = await this.executeProcessBlock(
+          node.data,
+          processContext,
+          databaseByReference,
+        );
+        if (output) {
+          processContext.output = output;
+        }
+        continue;
+      }
+
+      await this.executeNode(node);
+    }
+
     return {
       apiNode: {
         id: apiNode.id,
@@ -251,13 +284,27 @@ export class RuntimeEngine {
       executionOrder,
       response: {
         status: apiNode.data.responses?.success.statusCode ?? 200,
-        body: this.buildFinalResponseBody(apiNode.data, finalNode, payload),
+        body: this.buildFinalResponseBody(
+          apiNode.data,
+          finalNode,
+          payload,
+          processContext.output,
+        ),
       },
     };
   }
 
-  private async executeNode(node: RuntimeNode): Promise<void> {
+  private async executeNode(
+    node: RuntimeNode,
+    processContext: RuntimeProcessContext = { input: undefined },
+    databaseByReference: Map<string, DatabaseBlock> = this.createDatabaseReferenceMap(
+      this.collectGraphData().nodes,
+    ),
+  ): Promise<void> {
     switch (node.data.kind) {
+      case "process":
+        await this.executeProcessBlock(node.data, processContext, databaseByReference);
+        return;
       case "database":
         await this.executeDatabaseBlock(node.data);
         return;
