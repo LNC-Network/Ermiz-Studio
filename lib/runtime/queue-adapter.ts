@@ -167,7 +167,8 @@ export class BullMqQueueAdapter implements RuntimeQueueAdapter {
     this.workers.set(queueName, worker);
   }
 
-  public async drain(_queueName: string): Promise<number> {
+  public async drain(queueName: string): Promise<number> {
+    void queueName;
     // BullMQ workers process asynchronously; draining is managed by workers.
     return 0;
   }

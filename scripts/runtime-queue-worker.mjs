@@ -1,5 +1,4 @@
-/* eslint-disable no-console */
-const { Worker } = require("bullmq");
+import { Worker } from "bullmq";
 
 const queueName = process.env.RUNTIME_QUEUE_NAME || "runtime-default";
 const redisUrl = process.env.REDIS_URL;
