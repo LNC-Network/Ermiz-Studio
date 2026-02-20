@@ -16,49 +16,127 @@ const tabEnum = z.enum([
 
 const createSchema = z.object({
   tab: tabEnum,
-  name: z.string().min(1),
+  name: z.string().trim().min(1, "Name is required"),
 });
 
 export async function GET(req: NextRequest) {
-  const supabase = createRouteHandlerClient({ cookies });
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
-  await ensureUser(user.id, user.email ?? undefined);
+  try {
+    const supabase = createRouteHandlerClient({ cookies });
+    const {
+      data: { user },
+      error: authError,
+    } = await supabase.auth.getUser();
 
-  const { searchParams } = new URL(req.url);
-  const tab = searchParams.get("tab");
-  const parsedTab = tab ? tabEnum.safeParse(tab) : null;
-  if (tab && !parsedTab?.success) {
-    return NextResponse.json({ error: "invalid tab" }, { status: 400 });
+    if (authError || !user) {
+      return NextResponse.json(
+        { error: "Unauthorized", details: authError?.message },
+        { status: 401 }
+      );
+    }
+
+    // Ensure user exists in our DB
+    try {
+      await ensureUser(user.id, user.email ?? undefined);
+    } catch (dbError) {
+      console.error("Failed to ensure user:", dbError);
+      return NextResponse.json(
+        { error: "Database error during user verification" },
+        { status: 500 }
+      );
+    }
+
+    const { searchParams } = new URL(req.url);
+    const tab = searchParams.get("tab");
+
+    // Validate tab if present
+    let parsedTab = undefined;
+    if (tab) {
+      const result = tabEnum.safeParse(tab);
+      if (!result.success) {
+        return NextResponse.json(
+          { error: "Invalid tab parameter", details: result.error.flatten() },
+          { status: 400 }
+        );
+      }
+      parsedTab = result.data;
+    }
+
+    const sets = await prisma.documentSet.findMany({
+      where: {
+        userId: user.id,
+        tab: parsedTab,
+      },
+      include: { documents: true },
+      orderBy: { updatedAt: 'desc' }
+    });
+
+    return NextResponse.json({ documentSets: sets });
+  } catch (error) {
+    console.error("GET /api/document-sets error:", error);
+    return NextResponse.json(
+      { error: "Internal Server Error" },
+      { status: 500 }
+    );
   }
-
-  const sets = await prisma.documentSet.findMany({
-    where: { userId: user.id, tab: parsedTab?.success ? parsedTab.data : undefined },
-    include: { documents: true },
-  });
-
-  return NextResponse.json({ documentSets: sets });
 }
 
 export async function POST(req: NextRequest) {
-  const supabase = createRouteHandlerClient({ cookies });
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
-  await ensureUser(user.id, user.email ?? undefined);
+  try {
+    const supabase = createRouteHandlerClient({ cookies });
+    const {
+      data: { user },
+      error: authError,
+    } = await supabase.auth.getUser();
 
-  const json = await req.json();
-  const parsed = createSchema.safeParse(json);
-  if (!parsed.success) {
-    return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
+    if (authError || !user) {
+      return NextResponse.json(
+        { error: "Unauthorized", details: authError?.message },
+        { status: 401 }
+      );
+    }
+
+    try {
+      await ensureUser(user.id, user.email ?? undefined);
+    } catch (dbError) {
+      console.error("Failed to ensure user:", dbError);
+      return NextResponse.json(
+        { error: "Database error during user verification" },
+        { status: 500 }
+      );
+    }
+
+    let json;
+    try {
+      json = await req.json();
+    } catch {
+      return NextResponse.json(
+        { error: "Invalid JSON body" },
+        { status: 400 }
+      );
+    }
+
+    const parsed = createSchema.safeParse(json);
+    if (!parsed.success) {
+      return NextResponse.json(
+        { error: "Validation failed", details: parsed.error.flatten() },
+        { status: 400 }
+      );
+    }
+
+    const set = await prisma.documentSet.create({
+      data: {
+        userId: user.id,
+        tab: parsed.data.tab,
+        name: parsed.data.name,
+      },
+    });
+
+    return NextResponse.json({ documentSet: set }, { status: 201 });
+  } catch (error) {
+    console.error("POST /api/document-sets error:", error);
+    return NextResponse.json(
+      { error: "Internal Server Error" },
+      { status: 500 }
+    );
   }
-
-  const set = await prisma.documentSet.create({
-    data: { userId: user.id, tab: parsed.data.tab, name: parsed.data.name },
-  });
-
-  return NextResponse.json({ documentSet: set });
 }

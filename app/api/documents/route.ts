@@ -16,72 +16,142 @@ const tabEnum = z.enum([
 
 const createSchema = z.object({
   tab: tabEnum,
-  title: z.string().min(1),
+  title: z.string().trim().min(1, "Title is required"),
   content: z.unknown(),
   metadata: z.record(z.string(), z.unknown()).optional(),
   documentSetId: z.string().optional(),
 });
 
 export async function GET(req: NextRequest) {
-  const supabase = createRouteHandlerClient({ cookies });
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
-  await ensureUser(user.id, user.email ?? undefined);
+  try {
+    const supabase = createRouteHandlerClient({ cookies });
+    const {
+      data: { user },
+      error: authError,
+    } = await supabase.auth.getUser();
 
-  const { searchParams } = new URL(req.url);
-  const tabParam = searchParams.get("tab");
-  const parsedTab = tabParam ? tabEnum.safeParse(tabParam) : null;
-  if (tabParam && !parsedTab?.success) {
-    return NextResponse.json({ error: "invalid tab" }, { status: 400 });
+    if (authError || !user) {
+      return NextResponse.json(
+        { error: "Unauthorized", details: authError?.message },
+        { status: 401 }
+      );
+    }
+
+    try {
+      await ensureUser(user.id, user.email ?? undefined);
+    } catch (dbError) {
+      console.error("Failed to ensure user:", dbError);
+      return NextResponse.json(
+        { error: "Database error during user verification" },
+        { status: 500 }
+      );
+    }
+
+    const { searchParams } = new URL(req.url);
+    const tabParam = searchParams.get("tab");
+
+    let parsedTab = undefined;
+    if (tabParam) {
+      const result = tabEnum.safeParse(tabParam);
+      if (!result.success) {
+        return NextResponse.json(
+          { error: "Invalid tab parameter", details: result.error.flatten() },
+          { status: 400 }
+        );
+      }
+      parsedTab = result.data;
+    }
+
+    const documents = await prisma.document.findMany({
+      where: {
+        userId: user.id,
+        tab: parsedTab,
+      },
+      orderBy: { updatedAt: "desc" },
+    });
+
+    return NextResponse.json({ documents });
+  } catch (error) {
+    console.error("GET /api/documents error:", error);
+    return NextResponse.json(
+      { error: "Internal Server Error" },
+      { status: 500 }
+    );
   }
-
-  const documents = await prisma.document.findMany({
-    where: {
-      userId: user.id,
-      tab: parsedTab?.success ? parsedTab.data : undefined,
-    },
-    orderBy: { updatedAt: "desc" },
-  });
-
-  return NextResponse.json({ documents });
 }
 
 export async function POST(req: NextRequest) {
-  const supabase = createRouteHandlerClient({ cookies });
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
-  await ensureUser(user.id, user.email ?? undefined);
-
-  const json = await req.json();
-  const parsed = createSchema.safeParse(json);
-  if (!parsed.success) {
-    return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
-  }
-
-  // Consume 1 credit per document save (adjust as needed).
   try {
-    await requireCredits(user.id, 1);
-  } catch (err) {
-    return NextResponse.json({ error: (err as Error).message }, { status: 402 });
+    const supabase = createRouteHandlerClient({ cookies });
+    const {
+      data: { user },
+      error: authError,
+    } = await supabase.auth.getUser();
+
+    if (authError || !user) {
+      return NextResponse.json(
+        { error: "Unauthorized", details: authError?.message },
+        { status: 401 }
+      );
+    }
+
+    try {
+      await ensureUser(user.id, user.email ?? undefined);
+    } catch (dbError) {
+      console.error("Failed to ensure user:", dbError);
+      return NextResponse.json(
+        { error: "Database error during user verification" },
+        { status: 500 }
+      );
+    }
+
+    let json;
+    try {
+      json = await req.json();
+    } catch {
+      return NextResponse.json(
+        { error: "Invalid JSON body" },
+        { status: 400 }
+      );
+    }
+
+    const parsed = createSchema.safeParse(json);
+    if (!parsed.success) {
+      return NextResponse.json(
+        { error: "Validation failed", details: parsed.error.flatten() },
+        { status: 400 }
+      );
+    }
+
+    try {
+      await requireCredits(user.id, 1);
+    } catch (err) {
+      return NextResponse.json(
+        { error: "Insufficient credits", details: (err as Error).message },
+        { status: 402 }
+      );
+    }
+
+    const doc = await prisma.document.create({
+      data: {
+        userId: user.id,
+        tab: parsed.data.tab,
+        title: parsed.data.title,
+        content: parsed.data.content,
+        metadata: parsed.data.metadata,
+        version: 1,
+        documentSet: parsed.data.documentSetId
+          ? { connect: { id: parsed.data.documentSetId } }
+          : undefined,
+      },
+    });
+
+    return NextResponse.json({ document: doc }, { status: 201 });
+  } catch (error) {
+    console.error("POST /api/documents error:", error);
+    return NextResponse.json(
+      { error: "Internal Server Error" },
+      { status: 500 }
+    );
   }
-
-  const doc = await prisma.document.create({
-    data: {
-      userId: user.id,
-      tab: parsed.data.tab,
-      title: parsed.data.title,
-      content: parsed.data.content,
-      metadata: parsed.data.metadata,
-      version: 1,
-      documentSet: parsed.data.documentSetId
-        ? { connect: { id: parsed.data.documentSetId } }
-        : undefined,
-    },
-  });
-
-  return NextResponse.json({ document: doc });
 }
