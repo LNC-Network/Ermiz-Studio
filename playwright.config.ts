@@ -20,9 +20,8 @@ export default defineConfig({
     },
   ],
   webServer: {
-    command: "npm run dev",
+    command: "set E2E_BYPASS_AUTH=1&& npm run dev",
     url: baseURL,
     reuseExistingServer: !process.env.CI,
   },
 });
-

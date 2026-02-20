@@ -68,11 +68,22 @@ async function handleRequest(req: NextRequest, ctx: RouteContext) {
     );
   }
 
-  const flowResult = await engine.executeRestRequest({
-    method: req.method,
-    path: runtimePath,
-    payload,
-  });
+  let flowResult;
+  try {
+    flowResult = await engine.executeRestRequest({
+      method: req.method,
+      path: runtimePath,
+      payload,
+    });
+  } catch (error) {
+    return NextResponse.json(
+      {
+        error: "runtime_execution_failed",
+        message: error instanceof Error ? error.message : "unknown_error",
+      },
+      { status: 500 },
+    );
+  }
 
   if (!flowResult) {
     return NextResponse.json(

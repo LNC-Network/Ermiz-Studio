@@ -451,6 +451,11 @@ export class RuntimeEngine {
     for (const step of process.steps) {
       const stepKind = step.kind as string;
 
+      if (stepKind === "condition") {
+        this.validateProcessInput(process, step.id, context.input, step.config);
+        continue;
+      }
+
       if (stepKind === "db_operation") {
         const dbRef = (step.ref || "").trim();
         const databaseNode = dbRef ? databaseByReference.get(dbRef) : undefined;
@@ -493,6 +498,40 @@ export class RuntimeEngine {
     }
 
     return undefined;
+  }
+
+  private validateProcessInput(
+    process: ProcessDefinition,
+    stepId: string,
+    input: unknown,
+    config: Record<string, unknown> | undefined,
+  ): void {
+    const requiredFieldsRaw = config?.requiredFields;
+    const requiredFields = Array.isArray(requiredFieldsRaw)
+      ? requiredFieldsRaw.filter((field): field is string => typeof field === "string")
+      : [];
+
+    if (requiredFields.length === 0) {
+      return;
+    }
+
+    if (!input || typeof input !== "object" || Array.isArray(input)) {
+      throw new Error(
+        `Process "${process.id}" validation failed at step "${stepId}": input object required.`,
+      );
+    }
+
+    const payload = input as Record<string, unknown>;
+    const missing = requiredFields.filter((field) => {
+      const value = payload[field];
+      return value === undefined || value === null || value === "";
+    });
+
+    if (missing.length > 0) {
+      throw new Error(
+        `Process "${process.id}" validation failed at step "${stepId}": missing ${missing.join(", ")}`,
+      );
+    }
   }
 
   private isSafeSqlIdentifier(value: string): boolean {
