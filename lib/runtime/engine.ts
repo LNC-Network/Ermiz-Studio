@@ -136,15 +136,6 @@ const compareNodeIds = (a: RuntimeNode, b: RuntimeNode): number => {
   return a.id.localeCompare(b.id);
 };
 
-const IDENTIFIER_RE = /^[A-Za-z_][A-Za-z0-9_]*$/;
-
-const assertSqlIdentifier = (value: string, field: string): string => {
-  if (!IDENTIFIER_RE.test(value)) {
-    throw new Error(`Invalid SQL identifier for ${field}: "${value}"`);
-  }
-  return value;
-};
-
 export class RuntimeEngine {
   private static readonly prismaClientPool = new Map<string, PrismaClient>();
   private readonly graphs: GraphCollection;

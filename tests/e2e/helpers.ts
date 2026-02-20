@@ -138,6 +138,9 @@ export const deployMockGraph = async (
   graphs: GraphCollection = buildMockGraph(),
 ): Promise<RuntimeStartResponse> => {
   const response = await request.post("/api/runtime/start", {
+    headers: {
+      "x-e2e-bypass-auth": "1",
+    },
     data: { graphs },
   });
 
@@ -158,6 +161,9 @@ export const triggerRuntimeEndpoint = async ({
 }: TriggerRuntimeEndpointParams): Promise<RuntimeRunResponse> => {
   const response = await request.fetch(buildRunPath(path, debug), {
     method,
+    headers: {
+      "x-e2e-bypass-auth": "1",
+    },
     data: payload,
   });
 

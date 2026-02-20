@@ -133,6 +133,54 @@ test.describe("Database Block Runtime", () => {
         ],
         edges: [],
       },
+      deploy: {
+        nodes: [
+          {
+            id: "infra_compute_e2e",
+            type: "infra",
+            data: {
+              kind: "infra",
+              id: "infra_compute_e2e",
+              label: "E2E Compute",
+              provider: "generic",
+              environment: "dev",
+              region: "local",
+              tags: [],
+              resourceType: "ec2",
+              config: {
+                instanceType: "t3.micro",
+                ami: "ami-local",
+                count: 1,
+                subnetIds: "subnet-local",
+                securityGroups: "sg-local",
+                diskGb: 20,
+                autoscalingMin: 1,
+                autoscalingMax: 1,
+              },
+            },
+          },
+          {
+            id: "service_e2e",
+            type: "service_boundary",
+            data: {
+              kind: "service_boundary",
+              id: "service_e2e",
+              label: "E2E Service",
+              apiRefs: ["api_users_create"],
+              functionRefs: ["process_create_user"],
+              dataRefs: ["database_users"],
+              computeRef: "infra_compute_e2e",
+              communication: {
+                allowApiCalls: true,
+                allowQueueEvents: true,
+                allowEventBus: true,
+                allowDirectDbAccess: false,
+              },
+            },
+          },
+        ],
+        edges: [],
+      },
     };
 
     await deployMockGraph(request, graph);
@@ -174,4 +222,3 @@ test.describe("Database Block Runtime", () => {
     }
   });
 });
-

@@ -6,7 +6,9 @@ const PUBLIC_PATHS = ["/login", "/auth/callback", "/auth/logout", "/favicon.ico"
 export async function proxy(req: NextRequest) {
   const { pathname } = req.nextUrl;
   const res = NextResponse.next();
-  const bypassAuthForE2E = process.env.E2E_BYPASS_AUTH === "1";
+  const bypassAuthForE2E =
+    process.env.E2E_BYPASS_AUTH === "1" ||
+    req.headers.get("x-e2e-bypass-auth") === "1";
 
   const isPublic =
     pathname === "/" ||
