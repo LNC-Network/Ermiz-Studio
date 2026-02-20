@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { RuntimeEngine } from "@/lib/runtime/engine";
+import { analyzeDesignSystem } from "@/lib/runtime/architecture";
 import {
   getActiveRuntimeGraphs,
   getActiveRuntimeGraphsUpdatedAt,
@@ -51,6 +52,22 @@ async function handleRequest(req: NextRequest, ctx: RouteContext) {
   }
 
   const engine = new RuntimeEngine(activeGraphs);
+  const designReport = analyzeDesignSystem(activeGraphs);
+  const serviceErrors = designReport.serviceModel.issues.filter(
+    (issue) => issue.severity === "error",
+  );
+
+  if (serviceErrors.length > 0) {
+    return NextResponse.json(
+      {
+        error: "service_boundary_violation",
+        message: "Runtime request blocked by Service Boundary policy violations.",
+        issues: serviceErrors,
+      },
+      { status: 403 },
+    );
+  }
+
   const flowResult = await engine.executeRestRequest({
     method: req.method,
     path: runtimePath,

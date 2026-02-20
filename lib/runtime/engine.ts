@@ -136,6 +136,15 @@ const compareNodeIds = (a: RuntimeNode, b: RuntimeNode): number => {
   return a.id.localeCompare(b.id);
 };
 
+const IDENTIFIER_RE = /^[A-Za-z_][A-Za-z0-9_]*$/;
+
+const assertSqlIdentifier = (value: string, field: string): string => {
+  if (!IDENTIFIER_RE.test(value)) {
+    throw new Error(`Invalid SQL identifier for ${field}: "${value}"`);
+  }
+  return value;
+};
+
 export class RuntimeEngine {
   private static readonly prismaClientPool = new Map<string, PrismaClient>();
   private readonly graphs: GraphCollection;
@@ -454,6 +463,13 @@ export class RuntimeEngine {
         }
 
         await this.executeDatabaseBlock(databaseNode);
+
+        const operation = String(step.config?.operation ?? "")
+          .trim()
+          .toLowerCase();
+        if (operation === "create") {
+          await this.executeCreateDbOperation(databaseNode, step.config, context);
+        }
         continue;
       }
 
@@ -477,6 +493,108 @@ export class RuntimeEngine {
     }
 
     return undefined;
+  }
+
+  private isSafeSqlIdentifier(value: string): boolean {
+    return /^[A-Za-z_][A-Za-z0-9_]*$/.test(value);
+  }
+
+  private async executeCreateDbOperation(
+    databaseNode: DatabaseBlock,
+    config: Record<string, unknown> | undefined,
+    context: RuntimeProcessContext,
+  ): Promise<void> {
+    if (databaseNode.dbType !== "sql") {
+      console.warn(
+        `[RuntimeEngine] Create operation is only supported for SQL database blocks ("${databaseNode.id}").`,
+      );
+      return;
+    }
+
+    const tableCandidate =
+      String(config?.table ?? config?.model ?? "").trim() ||
+      (databaseNode.tables[0]?.name || "").trim();
+    if (!tableCandidate) {
+      console.warn(
+        `[RuntimeEngine] Create operation for "${databaseNode.id}" has no target table/model.`,
+      );
+      return;
+    }
+
+    const schemaCandidate =
+      String(config?.schema ?? "").trim() ||
+      databaseNode.schemas[0]?.trim() ||
+      "public";
+
+    if (!this.isSafeSqlIdentifier(schemaCandidate) || !this.isSafeSqlIdentifier(tableCandidate)) {
+      console.warn(
+        `[RuntimeEngine] Skipping create operation for "${databaseNode.id}" due to unsafe schema/table name.`,
+      );
+      return;
+    }
+
+    const payloadCandidate =
+      config?.data && typeof config.data === "object" && !Array.isArray(config.data)
+        ? (config.data as Record<string, unknown>)
+        : context.input && typeof context.input === "object" && !Array.isArray(context.input)
+          ? (context.input as Record<string, unknown>)
+          : null;
+
+    if (!payloadCandidate) {
+      console.warn(
+        `[RuntimeEngine] Create operation for "${databaseNode.id}" requires object payload data.`,
+      );
+      return;
+    }
+
+    const entries = Object.entries(payloadCandidate).filter(
+      ([, value]) => value !== undefined,
+    );
+    if (entries.length === 0) {
+      console.warn(
+        `[RuntimeEngine] Create operation for "${databaseNode.id}" has no insertable fields.`,
+      );
+      return;
+    }
+
+    for (const [column] of entries) {
+      if (!this.isSafeSqlIdentifier(column)) {
+        console.warn(
+          `[RuntimeEngine] Skipping create operation for "${databaseNode.id}" due to unsafe column "${column}".`,
+        );
+        return;
+      }
+    }
+
+    const connectionString = this.resolveDatabaseConnectionString(databaseNode);
+    if (!connectionString) {
+      console.error(
+        `[RuntimeEngine] Cannot run create operation for "${databaseNode.id}" without connection string.`,
+      );
+      return;
+    }
+
+    const prisma = this.getOrCreatePrismaClient(connectionString);
+    const columns = entries.map(([column]) => `"${column}"`).join(", ");
+    const placeholders = entries.map((_, index) => `$${index + 1}`).join(", ");
+    const values = entries.map(([, value]) => value);
+    const sql =
+      `INSERT INTO "${schemaCandidate}"."${tableCandidate}" (${columns}) ` +
+      `VALUES (${placeholders})`;
+
+    try {
+      await prisma.$connect();
+      await prisma.$executeRawUnsafe(sql, ...values);
+      context.output = {
+        ...(context.output || {}),
+        insertedTable: tableCandidate,
+      };
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "unknown_error";
+      console.error(
+        `[RuntimeEngine] Create operation failed for "${databaseNode.id}" on "${schemaCandidate}.${tableCandidate}": ${message}`,
+      );
+    }
   }
 
   private getQueueName(queueNode: QueueBlock): string {
