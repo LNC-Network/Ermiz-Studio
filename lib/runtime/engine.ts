@@ -4,7 +4,12 @@ import {
   DatabaseBlockSchema,
   NodeData,
   ProcessDefinition,
+  QueueBlock,
 } from "@/lib/schema/node";
+import {
+  createRuntimeQueueAdapter,
+  RuntimeQueueAdapter,
+} from "@/lib/runtime/queue-adapter";
 import { PrismaClient } from "@prisma/client";
 
 type RuntimeLayer = 0 | 1 | 2 | 3;
@@ -39,6 +44,16 @@ export type RuntimeFlowResult = {
 type RuntimeProcessContext = {
   input?: unknown;
   output?: Record<string, unknown>;
+};
+
+type RuntimeGraphExecutionContext = {
+  nodeById: Map<string, RuntimeNode>;
+  incomingById: Map<string, string[]>;
+  outgoingById: Map<string, string[]>;
+};
+
+type RuntimeEngineOptions = {
+  queueAdapter?: RuntimeQueueAdapter;
 };
 
 type RuntimeStartOptions = {
@@ -124,15 +139,20 @@ const compareNodeIds = (a: RuntimeNode, b: RuntimeNode): number => {
 export class RuntimeEngine {
   private static readonly prismaClientPool = new Map<string, PrismaClient>();
   private readonly graphs: GraphCollection;
+  private readonly queueAdapter: RuntimeQueueAdapter;
 
-  constructor(graphs: GraphCollection) {
+  constructor(graphs: GraphCollection, options?: RuntimeEngineOptions) {
     this.graphs = graphs;
+    this.queueAdapter = options?.queueAdapter ?? createRuntimeQueueAdapter();
   }
 
   public async start(options?: RuntimeStartOptions): Promise<RuntimeExecutionNode[]> {
     const { nodes, edges } = this.collectGraphData();
     const sortedNodes = this.topologicalSort(nodes, edges);
+    const explicitEdges = this.collectExplicitEdges();
+    const executionContext = this.buildExecutionContext(nodes, explicitEdges);
     const databaseByReference = this.createDatabaseReferenceMap(sortedNodes);
+    const processContext: RuntimeProcessContext = { input: undefined };
     const executionOrder = sortedNodes.map((node) => ({
       id: node.id,
       kind: node.data.kind,
@@ -148,7 +168,12 @@ export class RuntimeEngine {
     for (const [index, node] of executionOrder.entries()) {
       console.log(`[RuntimeEngine] Executing ${node.kind}:${node.id}`);
       options?.onExecute?.(node, index, executionOrder.length);
-      await this.executeNode(sortedNodes[index], { input: undefined }, databaseByReference);
+      await this.executeNode(
+        sortedNodes[index],
+        processContext,
+        databaseByReference,
+        executionContext,
+      );
     }
 
     return executionOrder;
@@ -233,6 +258,10 @@ export class RuntimeEngine {
     const flowEdges = edges.filter(
       (edge) => reachable.has(edge.source) && reachable.has(edge.target),
     );
+    const explicitEdges = this.collectExplicitEdges().filter(
+      (edge) => reachable.has(edge.source) && reachable.has(edge.target),
+    );
+    const executionContext = this.buildExecutionContext(flowNodes, explicitEdges);
     const ordered = this.topologicalSort(flowNodes, flowEdges);
     const executionOrder = ordered.map((node) => ({
       id: node.id,
@@ -267,7 +296,12 @@ export class RuntimeEngine {
         continue;
       }
 
-      await this.executeNode(node);
+      await this.executeNode(
+        node,
+        processContext,
+        databaseByReference,
+        executionContext,
+      );
     }
 
     return {
@@ -300,10 +334,26 @@ export class RuntimeEngine {
     databaseByReference: Map<string, DatabaseBlock> = this.createDatabaseReferenceMap(
       this.collectGraphData().nodes,
     ),
+    executionContext: RuntimeGraphExecutionContext = this.buildExecutionContext(
+      this.collectGraphData().nodes,
+      this.collectExplicitEdges(),
+    ),
   ): Promise<void> {
     switch (node.data.kind) {
       case "process":
-        await this.executeProcessBlock(node.data, processContext, databaseByReference);
+        {
+          const output = await this.executeProcessBlock(
+            node.data,
+            processContext,
+            databaseByReference,
+          );
+          if (output) {
+            processContext.output = output;
+          }
+        }
+        return;
+      case "queue":
+        await this.executeQueueBlock(node, processContext, executionContext);
         return;
       case "database":
         await this.executeDatabaseBlock(node.data);
@@ -363,6 +413,144 @@ export class RuntimeEngine {
       const message = error instanceof Error ? error.message : "unknown_error";
       console.error(
         `[RuntimeEngine] Failed to connect/validate database block "${database.id}": ${message}`,
+      );
+    }
+  }
+
+  private createDatabaseReferenceMap(nodes: RuntimeNode[]): Map<string, DatabaseBlock> {
+    const databaseByReference = new Map<string, DatabaseBlock>();
+
+    for (const node of nodes) {
+      if (node.data.kind !== "database") continue;
+      databaseByReference.set(node.id, node.data);
+      if (node.data.id) {
+        databaseByReference.set(node.data.id, node.data);
+      }
+      if (node.data.label) {
+        databaseByReference.set(node.data.label, node.data);
+      }
+    }
+
+    return databaseByReference;
+  }
+
+  private async executeProcessBlock(
+    process: ProcessDefinition,
+    context: RuntimeProcessContext,
+    databaseByReference: Map<string, DatabaseBlock>,
+  ): Promise<Record<string, unknown> | undefined> {
+    for (const step of process.steps) {
+      const stepKind = step.kind as string;
+
+      if (stepKind === "db_operation") {
+        const dbRef = (step.ref || "").trim();
+        const databaseNode = dbRef ? databaseByReference.get(dbRef) : undefined;
+
+        if (!databaseNode) {
+          console.warn(
+            `[RuntimeEngine] Process "${process.id}" references missing database "${dbRef}" in step "${step.id}".`,
+          );
+          continue;
+        }
+
+        await this.executeDatabaseBlock(databaseNode);
+        continue;
+      }
+
+      if (stepKind === "return") {
+        const config = step.config;
+        const explicitValue =
+          config && typeof config === "object"
+            ? (config as Record<string, unknown>).value
+            : undefined;
+
+        if (explicitValue && typeof explicitValue === "object" && !Array.isArray(explicitValue)) {
+          return explicitValue as Record<string, unknown>;
+        }
+
+        if (context.input && typeof context.input === "object" && !Array.isArray(context.input)) {
+          return context.input as Record<string, unknown>;
+        }
+
+        return { value: explicitValue ?? null };
+      }
+    }
+
+    return undefined;
+  }
+
+  private getQueueName(queueNode: QueueBlock): string {
+    const label = queueNode.label.trim();
+    return label.length > 0 ? label : queueNode.id;
+  }
+
+  private resolveQueueModes(
+    queueNode: RuntimeNode,
+    context: RuntimeGraphExecutionContext,
+  ): { ingestion: boolean; consumer: boolean } {
+    const incoming = context.incomingById.get(queueNode.id) ?? [];
+    const outgoing = context.outgoingById.get(queueNode.id) ?? [];
+
+    const isIngestion = incoming.some((sourceId) => {
+      const sourceNode = context.nodeById.get(sourceId);
+      return sourceNode?.data.kind !== "queue";
+    });
+
+    const isConsumer = outgoing.some((targetId) => {
+      const targetNode = context.nodeById.get(targetId);
+      return targetNode?.data.kind === "process" || targetNode?.data.kind === "api_binding";
+    });
+
+    if (!isIngestion && !isConsumer) {
+      return { ingestion: true, consumer: true };
+    }
+
+    return { ingestion: isIngestion, consumer: isConsumer };
+  }
+
+  private toQueuePayload(context: RuntimeProcessContext): Record<string, unknown> {
+    if (context.output && typeof context.output === "object") {
+      return context.output;
+    }
+
+    if (context.input && typeof context.input === "object" && !Array.isArray(context.input)) {
+      return context.input as Record<string, unknown>;
+    }
+
+    return {
+      value: context.input ?? null,
+    };
+  }
+
+  private async executeQueueBlock(
+    queueRuntimeNode: RuntimeNode,
+    context: RuntimeProcessContext,
+    graphContext: RuntimeGraphExecutionContext,
+  ): Promise<void> {
+    if (queueRuntimeNode.data.kind !== "queue") return;
+    const queueNode = queueRuntimeNode.data;
+    const queueName = this.getQueueName(queueNode);
+    const modes = this.resolveQueueModes(queueRuntimeNode, graphContext);
+    const backend = this.queueAdapter.kind;
+
+    if (modes.ingestion) {
+      const payload = this.toQueuePayload(context);
+      const job = await this.queueAdapter.enqueue(queueName, payload);
+      console.log(
+        `[RuntimeEngine] Enqueued job "${job.jobId}" to queue "${queueName}" (${backend}).`,
+      );
+    }
+
+    if (modes.consumer) {
+      await this.queueAdapter.registerWorker(queueName, async (payload) => {
+        console.log(
+          `[RuntimeEngine] Processed queue job from "${queueName}" with payload keys: ${Object.keys(payload).join(", ")}.`,
+        );
+      });
+
+      const processedCount = await this.queueAdapter.drain(queueName);
+      console.log(
+        `[RuntimeEngine] Queue worker ready for "${queueName}" (${backend}, processed ${processedCount} jobs).`,
       );
     }
   }
@@ -427,7 +615,12 @@ export class RuntimeEngine {
     apiNode: Extract<NodeData, { kind: "api_binding" }>,
     finalNode: RuntimeNode,
     payload?: unknown,
+    processOutput?: Record<string, unknown>,
   ): Record<string, unknown> {
+    if (processOutput && Object.keys(processOutput).length > 0) {
+      return processOutput;
+    }
+
     if (finalNode.data.kind === "process") {
       const processPayload: Record<string, unknown> = {};
       for (const field of finalNode.data.outputs.success) {
@@ -463,6 +656,38 @@ export class RuntimeEngine {
       finalNodeKind: finalNode.data.kind,
       finalNodeLabel: finalNode.data.label || finalNode.id,
     };
+  }
+
+  private collectExplicitEdges(): RuntimeEdge[] {
+    const edges: RuntimeEdge[] = [];
+    for (const graph of Object.values(this.graphs)) {
+      for (const edge of graph?.edges ?? []) {
+        edges.push({ source: edge.source, target: edge.target });
+      }
+    }
+    return edges;
+  }
+
+  private buildExecutionContext(
+    nodes: RuntimeNode[],
+    edges: RuntimeEdge[],
+  ): RuntimeGraphExecutionContext {
+    const nodeById = new Map(nodes.map((node) => [node.id, node]));
+    const incomingById = new Map<string, string[]>();
+    const outgoingById = new Map<string, string[]>();
+
+    for (const node of nodes) {
+      incomingById.set(node.id, []);
+      outgoingById.set(node.id, []);
+    }
+
+    for (const edge of edges) {
+      if (!nodeById.has(edge.source) || !nodeById.has(edge.target)) continue;
+      outgoingById.get(edge.source)?.push(edge.target);
+      incomingById.get(edge.target)?.push(edge.source);
+    }
+
+    return { nodeById, incomingById, outgoingById };
   }
 
   private collectGraphData(): { nodes: RuntimeNode[]; edges: RuntimeEdge[] } {

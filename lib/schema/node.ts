@@ -100,6 +100,7 @@ export const StepKindSchema = z.enum([
   "condition",
   "transform",
   "ref",
+  "return",
 ]);
 
 export const ProcessStepSchema = z.object({
