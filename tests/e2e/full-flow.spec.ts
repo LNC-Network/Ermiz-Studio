@@ -234,6 +234,7 @@ const buildFullFlowGraph = (
 };
 
 test.describe("Runtime Full Flow", () => {
+  test.describe.configure({ mode: "serial" });
   let prisma: PrismaClient | null = null;
   const databaseUrl = process.env.DATABASE_URL || "";
 

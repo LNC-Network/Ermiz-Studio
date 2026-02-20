@@ -1,3 +1,6 @@
+Running this spec serially (test.describe.configure({ mode: "serial" }) or Playwright workers override).
+  2. Making RuntimeEngine.start() perform non-strict initialization (skip input-required process validation), while keeping strict validation for     
+     request-triggered execution via /api/run/....
 # 1. Process Definition (Core Unit)
 
 This is the **most important non-standard doc**.

@@ -44,6 +44,7 @@ export type RuntimeFlowResult = {
 type RuntimeProcessContext = {
   input?: unknown;
   output?: Record<string, unknown>;
+  strictValidation?: boolean;
 };
 
 type RuntimeGraphExecutionContext = {
@@ -152,7 +153,10 @@ export class RuntimeEngine {
     const explicitEdges = this.collectExplicitEdges();
     const executionContext = this.buildExecutionContext(nodes, explicitEdges);
     const databaseByReference = this.createDatabaseReferenceMap(sortedNodes);
-    const processContext: RuntimeProcessContext = { input: undefined };
+    const processContext: RuntimeProcessContext = {
+      input: undefined,
+      strictValidation: false,
+    };
     const executionOrder = sortedNodes.map((node) => ({
       id: node.id,
       kind: node.data.kind,
@@ -279,7 +283,10 @@ export class RuntimeEngine {
       throw new Error(`API node "${apiNodeId}" is invalid or missing`);
     }
 
-    const processContext: RuntimeProcessContext = { input: payload };
+    const processContext: RuntimeProcessContext = {
+      input: payload,
+      strictValidation: true,
+    };
     const databaseByReference = this.createDatabaseReferenceMap(nodes);
 
     for (const node of ordered) {
@@ -330,7 +337,10 @@ export class RuntimeEngine {
 
   private async executeNode(
     node: RuntimeNode,
-    processContext: RuntimeProcessContext = { input: undefined },
+    processContext: RuntimeProcessContext = {
+      input: undefined,
+      strictValidation: false,
+    },
     databaseByReference: Map<string, DatabaseBlock> = this.createDatabaseReferenceMap(
       this.collectGraphData().nodes,
     ),
@@ -443,7 +453,9 @@ export class RuntimeEngine {
       const stepKind = step.kind as string;
 
       if (stepKind === "condition") {
-        this.validateProcessInput(process, step.id, context.input, step.config);
+        if (context.strictValidation) {
+          this.validateProcessInput(process, step.id, context.input, step.config);
+        }
         continue;
       }
 
