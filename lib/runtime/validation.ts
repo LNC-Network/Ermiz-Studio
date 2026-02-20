@@ -3,6 +3,7 @@ import { NodeDataSchema } from "@/lib/schema/node";
 
 const RuntimeGraphNodeSchema = z.object({
   id: z.string().min(1),
+  type: z.string().optional(),
   data: NodeDataSchema,
 });
 

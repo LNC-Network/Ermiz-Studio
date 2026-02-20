@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { RuntimeEngine } from "@/lib/runtime/engine";
+import { setActiveRuntimeGraphs } from "@/lib/runtime/state";
 import { RuntimeStartPayloadSchema } from "@/lib/runtime/validation";
 
 export async function POST(req: NextRequest) {
@@ -22,6 +23,7 @@ export async function POST(req: NextRequest) {
     );
   }
 
+  setActiveRuntimeGraphs(parsed.data.graphs);
   const engine = new RuntimeEngine(parsed.data.graphs);
   const executionOrder = await engine.start();
 

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { RuntimeEngine } from "@/lib/runtime/engine";
+import { setActiveRuntimeGraphs } from "@/lib/runtime/state";
 import { RuntimeStartPayloadSchema } from "@/lib/runtime/validation";
 
 const toSseChunk = (event: string, payload: unknown): string =>
@@ -25,6 +26,7 @@ export async function POST(req: NextRequest) {
     );
   }
 
+  setActiveRuntimeGraphs(parsed.data.graphs);
   const encoder = new TextEncoder();
 
   const stream = new ReadableStream<Uint8Array>({
