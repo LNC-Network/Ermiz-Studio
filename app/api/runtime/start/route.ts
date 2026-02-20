@@ -23,7 +23,7 @@ export async function POST(req: NextRequest) {
   }
 
   const engine = new RuntimeEngine(parsed.data.graphs);
-  const executionOrder = engine.start();
+  const executionOrder = await engine.start();
 
   return NextResponse.json({
     ok: true,

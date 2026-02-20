@@ -28,7 +28,7 @@ export async function POST(req: NextRequest) {
   const encoder = new TextEncoder();
 
   const stream = new ReadableStream<Uint8Array>({
-    start(controller) {
+    async start(controller) {
       const send = (event: string, data: unknown) => {
         controller.enqueue(encoder.encode(toSseChunk(event, data)));
       };
@@ -37,7 +37,7 @@ export async function POST(req: NextRequest) {
         send("status", { message: "runtime_started" });
 
         const engine = new RuntimeEngine(parsed.data.graphs);
-        const executionOrder = engine.start({
+        const executionOrder = await engine.start({
           onOrder: (node, index, total) => {
             send("order", {
               index: index + 1,

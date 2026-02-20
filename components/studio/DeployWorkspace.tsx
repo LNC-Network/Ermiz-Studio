@@ -2,6 +2,48 @@
 import React, { useMemo, useState } from "react";
 import { analyzeDesignSystem, GraphCollection } from "@/lib/runtime/architecture";
 import { useStore } from "@/store/useStore";
+
+type RuntimeExecutionNode = {
+  id: string;
+  kind: string;
+  label: string;
+};
+
+type RuntimeLogEntry = {
+  id: string;
+  event: string;
+  message: string;
+};
+
+const parseSseEvent = (
+  rawEvent: string,
+): { event: string; data: Record<string, unknown> } | null => {
+  const lines = rawEvent.split("\n");
+  let event = "message";
+  const dataLines: string[] = [];
+
+  for (const line of lines) {
+    if (line.startsWith("event:")) {
+      event = line.slice("event:".length).trim();
+      continue;
+    }
+    if (line.startsWith("data:")) {
+      dataLines.push(line.slice("data:".length).trim());
+    }
+  }
+
+  if (dataLines.length === 0) return null;
+
+  try {
+    return {
+      event,
+      data: JSON.parse(dataLines.join("\n")) as Record<string, unknown>,
+    };
+  } catch {
+    return null;
+  }
+};
+
 export function DeployWorkspace() {
   const graphs = useStore((state) => state.graphs);
   const [platform, setPlatform] = useState("vercel");
@@ -10,7 +52,8 @@ export function DeployWorkspace() {
   const [environment, setEnvironment] = useState("production");
   const [isStartingRuntime, setIsStartingRuntime] = useState(false);
   const [runtimeError, setRuntimeError] = useState<string | null>(null);
-  const [executionOrder, setExecutionOrder] = useState<string[]>([]);
+  const [executionOrder, setExecutionOrder] = useState<RuntimeExecutionNode[]>([]);
+  const [runtimeLogs, setRuntimeLogs] = useState<RuntimeLogEntry[]>([]);
   const architecture = useMemo(
     () => analyzeDesignSystem(graphs as unknown as GraphCollection),
     [graphs],
@@ -20,28 +63,71 @@ export function DeployWorkspace() {
   const handleStartRuntime = async () => {
     setIsStartingRuntime(true);
     setRuntimeError(null);
+    setExecutionOrder([]);
+    setRuntimeLogs([]);
 
     try {
-      const response = await fetch("/api/runtime/start", {
+      const response = await fetch("/api/runtime/stream", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ graphs }),
       });
-      const payload = (await response.json()) as {
-        executionOrder?: string[];
-        error?: string;
-      };
 
       if (!response.ok) {
+        const payload = (await response.json()) as { error?: string };
         setRuntimeError(payload.error || "runtime_start_failed");
-        setExecutionOrder([]);
         return;
       }
 
-      setExecutionOrder(payload.executionOrder ?? []);
+      if (!response.body) {
+        setRuntimeError("runtime_stream_unavailable");
+        return;
+      }
+
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = "";
+
+      while (true) {
+        const { value, done } = await reader.read();
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+
+        let boundaryIndex = buffer.indexOf("\n\n");
+        while (boundaryIndex !== -1) {
+          const raw = buffer.slice(0, boundaryIndex).trim();
+          buffer = buffer.slice(boundaryIndex + 2);
+          boundaryIndex = buffer.indexOf("\n\n");
+
+          if (!raw) continue;
+          const parsedEvent = parseSseEvent(raw);
+          if (!parsedEvent) continue;
+
+          const message = String(parsedEvent.data.message ?? parsedEvent.event);
+          setRuntimeLogs((prev) => [
+            ...prev,
+            {
+              id: `${Date.now()}-${Math.random().toString(16).slice(2)}`,
+              event: parsedEvent.event,
+              message,
+            },
+          ]);
+
+          if (parsedEvent.event === "complete") {
+            const streamedOrder = parsedEvent.data.executionOrder;
+            if (Array.isArray(streamedOrder)) {
+              setExecutionOrder(streamedOrder as RuntimeExecutionNode[]);
+            }
+          }
+
+          if (parsedEvent.event === "error") {
+            setRuntimeError(String(parsedEvent.data.error ?? "runtime_start_failed"));
+          }
+        }
+      }
     } catch {
       setRuntimeError("runtime_start_failed");
-      setExecutionOrder([]);
     } finally {
       setIsStartingRuntime(false);
     }
@@ -298,9 +384,31 @@ export function DeployWorkspace() {
                 <div style={{ fontSize: 11, color: "var(--muted)" }}>
                   Last execution order ({executionOrder.length} nodes):
                 </div>
-                {executionOrder.map((id, index) => (
-                  <div key={`${id}-${index}`} style={{ fontSize: 12 }}>
-                    {index + 1}. {id}
+                {executionOrder.map((node, index) => (
+                  <div key={`${node.id}-${index}`} style={{ fontSize: 12 }}>
+                    {index + 1}. {node.kind} · {node.label} ({node.id})
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {runtimeLogs.length > 0 && (
+              <div
+                style={{
+                  border: "1px solid var(--border)",
+                  borderRadius: 10,
+                  padding: "8px 10px",
+                  background: "var(--floating)",
+                  display: "grid",
+                  gap: 6,
+                }}
+              >
+                <div style={{ fontSize: 11, color: "var(--muted)" }}>
+                  Live runtime logs:
+                </div>
+                {runtimeLogs.slice(-20).map((log) => (
+                  <div key={log.id} style={{ fontSize: 11, color: "var(--muted)" }}>
+                    [{log.event}] {log.message}
                   </div>
                 ))}
               </div>

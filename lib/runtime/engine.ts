@@ -1,11 +1,17 @@
 import { GraphCollection } from "@/lib/runtime/architecture";
-import { NodeData } from "@/lib/schema/node";
+import {
+  DatabaseBlock,
+  DatabaseBlockSchema,
+  NodeData,
+} from "@/lib/schema/node";
+import { PrismaClient } from "@prisma/client";
 
 type RuntimeLayer = 0 | 1 | 2 | 3;
 
 type RuntimeNode = {
   id: string;
   data: NodeData;
+  type?: string;
 };
 
 type RuntimeEdge = {
@@ -17,6 +23,16 @@ export type RuntimeExecutionNode = {
   id: string;
   kind: NodeData["kind"];
   label: string;
+};
+
+export type RuntimeFlowResult = {
+  apiNode: RuntimeExecutionNode;
+  finalNode: RuntimeExecutionNode;
+  executionOrder: RuntimeExecutionNode[];
+  response: {
+    status: number;
+    body: Record<string, unknown>;
+  };
 };
 
 type RuntimeStartOptions = {
@@ -48,6 +64,50 @@ const getRuntimeLayer = (node: NodeData): RuntimeLayer | null => {
   }
 };
 
+const escapeRegex = (value: string): string =>
+  value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
+const normalizePath = (path: string): string => {
+  const withLeadingSlash = path.startsWith("/") ? path : `/${path}`;
+  const normalized = withLeadingSlash.replace(/\/+/g, "/");
+  if (normalized.length > 1 && normalized.endsWith("/")) {
+    return normalized.slice(0, -1);
+  }
+  return normalized;
+};
+
+const routePatternToRegex = (route: string): RegExp => {
+  const normalized = normalizePath(route);
+  const segments = normalized.split("/").filter(Boolean);
+  if (segments.length === 0) {
+    return /^\/$/;
+  }
+
+  const pattern = segments
+    .map((segment) => {
+      if (segment.startsWith("[...") && segment.endsWith("]")) return ".+";
+      if (segment.startsWith("[") && segment.endsWith("]")) return "[^/]+";
+      if (segment.startsWith(":")) return "[^/]+";
+      if (segment.startsWith("{") && segment.endsWith("}")) return "[^/]+";
+      return escapeRegex(segment);
+    })
+    .join("/");
+
+  return new RegExp(`^/${pattern}$`);
+};
+
+const matchesHttpRoute = (route: string, path: string): boolean =>
+  routePatternToRegex(route).test(normalizePath(path));
+
+const defaultValueForType = (type: string): unknown => {
+  if (type === "string") return "";
+  if (type === "number") return 0;
+  if (type === "boolean") return false;
+  if (type === "array") return [];
+  if (type === "object") return {};
+  return null;
+};
+
 const compareNodeIds = (a: RuntimeNode, b: RuntimeNode): number => {
   const layerA = getRuntimeLayer(a.data) ?? Number.MAX_SAFE_INTEGER;
   const layerB = getRuntimeLayer(b.data) ?? Number.MAX_SAFE_INTEGER;
@@ -56,13 +116,14 @@ const compareNodeIds = (a: RuntimeNode, b: RuntimeNode): number => {
 };
 
 export class RuntimeEngine {
+  private static readonly prismaClientPool = new Map<string, PrismaClient>();
   private readonly graphs: GraphCollection;
 
   constructor(graphs: GraphCollection) {
     this.graphs = graphs;
   }
 
-  public start(options?: RuntimeStartOptions): RuntimeExecutionNode[] {
+  public async start(options?: RuntimeStartOptions): Promise<RuntimeExecutionNode[]> {
     const { nodes, edges } = this.collectGraphData();
     const sortedNodes = this.topologicalSort(nodes, edges);
     const executionOrder = sortedNodes.map((node) => ({
@@ -80,9 +141,281 @@ export class RuntimeEngine {
     for (const [index, node] of executionOrder.entries()) {
       console.log(`[RuntimeEngine] Executing ${node.kind}:${node.id}`);
       options?.onExecute?.(node, index, executionOrder.length);
+      await this.executeNode(sortedNodes[index]);
     }
 
     return executionOrder;
+  }
+
+  public findRestApiNode(
+    method: string,
+    path: string,
+  ): RuntimeExecutionNode | null {
+    const { nodes } = this.collectGraphData();
+    const normalizedMethod = method.toUpperCase();
+    const normalizedPath = normalizePath(path);
+
+    for (const node of nodes) {
+      const api = node.data;
+      if (api.kind !== "api_binding") continue;
+      if (api.protocol !== "rest") continue;
+
+      const isRestBlock = node.type === "api_rest" || node.type === "api_binding";
+      if (!isRestBlock) continue;
+
+      const route = (api.route || "").trim();
+      const apiMethod = (api.method || "").toUpperCase();
+      if (!route || !apiMethod) continue;
+
+      if (apiMethod !== normalizedMethod) continue;
+      if (!matchesHttpRoute(route, normalizedPath)) continue;
+
+      return {
+        id: node.id,
+        kind: api.kind,
+        label: api.label || node.id,
+      };
+    }
+
+    return null;
+  }
+
+  public executeRestRequest(params: {
+    method: string;
+    path: string;
+    payload?: unknown;
+  }): RuntimeFlowResult | null {
+    const apiNode = this.findRestApiNode(params.method, params.path);
+    if (!apiNode) return null;
+    return this.executeFromApiNode(apiNode.id, params.payload);
+  }
+
+  public executeFromApiNode(apiNodeId: string, payload?: unknown): RuntimeFlowResult {
+    const { nodes, edges } = this.collectGraphData();
+    const nodeById = new Map(nodes.map((node) => [node.id, node]));
+    const adjacency = new Map<string, Set<string>>();
+
+    for (const node of nodes) {
+      adjacency.set(node.id, new Set<string>());
+    }
+    for (const edge of edges) {
+      if (!nodeById.has(edge.source) || !nodeById.has(edge.target)) continue;
+      adjacency.get(edge.source)?.add(edge.target);
+    }
+
+    const reachable = new Set<string>();
+    const queue: string[] = [apiNodeId];
+    while (queue.length > 0) {
+      const current = queue.shift();
+      if (!current || reachable.has(current)) continue;
+      reachable.add(current);
+      const neighbors = adjacency.get(current);
+      if (!neighbors) continue;
+      for (const nextId of neighbors) {
+        if (!reachable.has(nextId)) queue.push(nextId);
+      }
+    }
+
+    const flowNodes = nodes.filter((node) => reachable.has(node.id));
+    const flowEdges = edges.filter(
+      (edge) => reachable.has(edge.source) && reachable.has(edge.target),
+    );
+    const ordered = this.topologicalSort(flowNodes, flowEdges);
+    const executionOrder = ordered.map((node) => ({
+      id: node.id,
+      kind: node.data.kind,
+      label: node.data.label || node.id,
+    }));
+
+    if (executionOrder.length === 0) {
+      throw new Error(`No executable flow found for API node "${apiNodeId}"`);
+    }
+
+    const finalNode = ordered[ordered.length - 1];
+    const apiNode = nodeById.get(apiNodeId);
+    if (!apiNode || apiNode.data.kind !== "api_binding") {
+      throw new Error(`API node "${apiNodeId}" is invalid or missing`);
+    }
+
+    return {
+      apiNode: {
+        id: apiNode.id,
+        kind: apiNode.data.kind,
+        label: apiNode.data.label || apiNode.id,
+      },
+      finalNode: {
+        id: finalNode.id,
+        kind: finalNode.data.kind,
+        label: finalNode.data.label || finalNode.id,
+      },
+      executionOrder,
+      response: {
+        status: apiNode.data.responses?.success.statusCode ?? 200,
+        body: this.buildFinalResponseBody(apiNode.data, finalNode, payload),
+      },
+    };
+  }
+
+  private async executeNode(node: RuntimeNode): Promise<void> {
+    switch (node.data.kind) {
+      case "database":
+        await this.executeDatabaseBlock(node.data);
+        return;
+      default:
+        return;
+    }
+  }
+
+  private async executeDatabaseBlock(node: DatabaseBlock): Promise<void> {
+    const parsed = DatabaseBlockSchema.safeParse(node);
+    if (!parsed.success) {
+      console.error(
+        `[RuntimeEngine] Invalid database block "${node.id}" configuration.`,
+        parsed.error.flatten(),
+      );
+      return;
+    }
+
+    const database = parsed.data;
+    const connectionString = this.resolveDatabaseConnectionString(database);
+
+    if (!connectionString) {
+      console.error(
+        `[RuntimeEngine] Database block "${database.id}" has no connection string configured.`,
+      );
+      return;
+    }
+
+    const prisma = this.getOrCreatePrismaClient(connectionString);
+
+    try {
+      await prisma.$connect();
+
+      const modelTables = (database.tables ?? [])
+        .map((table) => table.name.trim())
+        .filter(Boolean);
+
+      if (modelTables.length === 0) {
+        return;
+      }
+
+      const configuredSchemas = (database.schemas ?? [])
+        .map((schema) => schema.trim())
+        .filter(Boolean);
+      const schemas = configuredSchemas.length > 0 ? configuredSchemas : ["public"];
+
+      for (const tableName of modelTables) {
+        const exists = await this.tableExists(prisma, schemas, tableName);
+        if (!exists) {
+          console.warn(
+            `[RuntimeEngine] Table "${tableName}" for database block "${database.id}" was not found.`,
+          );
+        }
+      }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "unknown_error";
+      console.error(
+        `[RuntimeEngine] Failed to connect/validate database block "${database.id}": ${message}`,
+      );
+    }
+  }
+
+  private resolveDatabaseConnectionString(node: DatabaseBlock): string {
+    const runtimeEnv = process.env.RUNTIME_DB_ENV?.trim().toLowerCase();
+    const envConnectionString = runtimeEnv === "production"
+      ? node.environments.production.connectionString
+      : runtimeEnv === "staging"
+        ? node.environments.staging.connectionString
+        : node.environments.dev.connectionString;
+
+    return envConnectionString.trim() || process.env.DATABASE_URL?.trim() || "";
+  }
+
+  private getOrCreatePrismaClient(connectionString: string): PrismaClient {
+    const pooled = RuntimeEngine.prismaClientPool.get(connectionString);
+    if (pooled) {
+      return pooled;
+    }
+
+    const client = new PrismaClient({
+      datasources: {
+        db: {
+          url: connectionString,
+        },
+      },
+      log:
+        process.env.NODE_ENV === "development"
+          ? ["query", "error", "warn"]
+          : ["error"],
+    });
+
+    RuntimeEngine.prismaClientPool.set(connectionString, client);
+    return client;
+  }
+
+  private async tableExists(
+    prisma: PrismaClient,
+    schemas: string[],
+    tableName: string,
+  ): Promise<boolean> {
+    for (const schemaName of schemas) {
+      const result = await prisma.$queryRaw<Array<{ exists: boolean }>>`
+        SELECT EXISTS (
+          SELECT 1
+          FROM information_schema.tables
+          WHERE table_schema = ${schemaName}
+            AND table_name = ${tableName}
+        ) AS "exists"
+      `;
+
+      if (result[0]?.exists) {
+        return true;
+      }
+    }
+
+    return false;
+  }
+
+  private buildFinalResponseBody(
+    apiNode: Extract<NodeData, { kind: "api_binding" }>,
+    finalNode: RuntimeNode,
+    payload?: unknown,
+  ): Record<string, unknown> {
+    if (finalNode.data.kind === "process") {
+      const processPayload: Record<string, unknown> = {};
+      for (const field of finalNode.data.outputs.success) {
+        const inputValue =
+          payload && typeof payload === "object"
+            ? (payload as Record<string, unknown>)[field.name]
+            : undefined;
+        processPayload[field.name] =
+          inputValue !== undefined ? inputValue : defaultValueForType(field.type);
+      }
+      if (Object.keys(processPayload).length > 0) {
+        return processPayload;
+      }
+    }
+
+    const apiSuccessFields = apiNode.responses?.success.schema ?? [];
+    if (apiSuccessFields.length > 0) {
+      const apiPayload: Record<string, unknown> = {};
+      for (const field of apiSuccessFields) {
+        const inputValue =
+          payload && typeof payload === "object"
+            ? (payload as Record<string, unknown>)[field.name]
+            : undefined;
+        apiPayload[field.name] =
+          inputValue !== undefined ? inputValue : defaultValueForType(field.type);
+      }
+      return apiPayload;
+    }
+
+    return {
+      ok: true,
+      finalNodeId: finalNode.id,
+      finalNodeKind: finalNode.data.kind,
+      finalNodeLabel: finalNode.data.label || finalNode.id,
+    };
   }
 
   private collectGraphData(): { nodes: RuntimeNode[]; edges: RuntimeEdge[] } {
@@ -93,7 +426,11 @@ export class RuntimeEngine {
       for (const node of graph?.nodes ?? []) {
         if (getRuntimeLayer(node.data) === null) continue;
         if (!nodeById.has(node.id)) {
-          nodeById.set(node.id, { id: node.id, data: node.data });
+          nodeById.set(node.id, {
+            id: node.id,
+            data: node.data,
+            type: (node as { type?: string }).type,
+          });
         }
       }
 
@@ -178,8 +515,9 @@ export class RuntimeEngine {
     }
 
     if (ordered.length !== nodes.length) {
+      const orderedIds = new Set(ordered.map((node) => node.id));
       const unresolved = nodes
-        .filter((node) => !ordered.some((visited) => visited.id === node.id))
+        .filter((node) => !orderedIds.has(node.id))
         .sort(compareNodeIds);
       console.warn(
         "[RuntimeEngine] Cycle or unresolved dependencies detected. Appending remaining nodes.",
