@@ -8,11 +8,44 @@ export function DeployWorkspace() {
   const [credentialType, setCredentialType] = useState("oauth");
   const [billingMode, setBillingMode] = useState("platform");
   const [environment, setEnvironment] = useState("production");
+  const [isStartingRuntime, setIsStartingRuntime] = useState(false);
+  const [runtimeError, setRuntimeError] = useState<string | null>(null);
+  const [executionOrder, setExecutionOrder] = useState<string[]>([]);
   const architecture = useMemo(
     () => analyzeDesignSystem(graphs as unknown as GraphCollection),
     [graphs],
   );
   const deployBlocked = !architecture.deploy.ready;
+
+  const handleStartRuntime = async () => {
+    setIsStartingRuntime(true);
+    setRuntimeError(null);
+
+    try {
+      const response = await fetch("/api/runtime/start", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ graphs }),
+      });
+      const payload = (await response.json()) as {
+        executionOrder?: string[];
+        error?: string;
+      };
+
+      if (!response.ok) {
+        setRuntimeError(payload.error || "runtime_start_failed");
+        setExecutionOrder([]);
+        return;
+      }
+
+      setExecutionOrder(payload.executionOrder ?? []);
+    } catch {
+      setRuntimeError("runtime_start_failed");
+      setExecutionOrder([]);
+    } finally {
+      setIsStartingRuntime(false);
+    }
+  };
 
   const platforms = [
     {
@@ -99,13 +132,17 @@ export function DeployWorkspace() {
             </button>
             <button
               type="button"
+              onClick={handleStartRuntime}
+              disabled={isStartingRuntime}
               style={{
                 ...actionButtonStyle,
                 background:
                   "color-mix(in srgb, var(--primary) 20%, var(--panel) 80%)",
+                opacity: isStartingRuntime ? 0.75 : 1,
+                cursor: isStartingRuntime ? "not-allowed" : "pointer",
               }}
             >
-              Build
+              {isStartingRuntime ? "Running Runtime..." : "Build"}
             </button>
             <button
               type="button"
@@ -222,6 +259,52 @@ export function DeployWorkspace() {
                 </div>
               </div>
             ))}
+          </div>
+
+          <div style={{ fontSize: 13, fontWeight: 600 }}>Runtime Execution</div>
+          <div style={{ display: "grid", gap: 8 }}>
+            {runtimeError && (
+              <div
+                style={{
+                  border: "1px solid color-mix(in srgb, #ef4444 40%, var(--border) 60%)",
+                  borderRadius: 8,
+                  padding: "7px 9px",
+                  fontSize: 11,
+                  color: "#fda4af",
+                  background: "color-mix(in srgb, #ef4444 12%, var(--panel) 88%)",
+                }}
+              >
+                Failed to start runtime: {runtimeError}
+              </div>
+            )}
+
+            {!runtimeError && executionOrder.length === 0 && (
+              <div style={{ fontSize: 11, color: "var(--muted)" }}>
+                No runtime execution yet. Click Build to run `RuntimeEngine.start()`.
+              </div>
+            )}
+
+            {executionOrder.length > 0 && (
+              <div
+                style={{
+                  border: "1px solid var(--border)",
+                  borderRadius: 10,
+                  padding: "8px 10px",
+                  background: "var(--floating)",
+                  display: "grid",
+                  gap: 6,
+                }}
+              >
+                <div style={{ fontSize: 11, color: "var(--muted)" }}>
+                  Last execution order ({executionOrder.length} nodes):
+                </div>
+                {executionOrder.map((id, index) => (
+                  <div key={`${id}-${index}`} style={{ fontSize: 12 }}>
+                    {index + 1}. {id}
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
 
           <div style={{ fontSize: 13, fontWeight: 600 }}>Service Boundary Rules</div>
