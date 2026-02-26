@@ -8,13 +8,14 @@ import { ensureUser, requireCredits } from "@/lib/credit";
 const updateSchema = z.object({
   title: z.string().min(1).optional(),
   content: z.any().optional(),
-  metadata: z.record(z.any()).optional(),
+  metadata: z.record(z.string(), z.any()).optional(),
 });
 
 export async function GET(
   req: NextRequest,
-  { params }: { params: { id: string } },
+  { params }: { params: Promise<{ id: string }> },
 ) {
+  const { id } = await params;
   const supabase = createRouteHandlerClient({ cookies });
   const {
     data: { user },
@@ -22,7 +23,7 @@ export async function GET(
   if (!user) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
 
   const doc = await prisma.document.findFirst({
-    where: { id: params.id, userId: user.id },
+    where: { id, userId: user.id },
   });
   if (!doc) {
     return NextResponse.json({ error: "not found" }, { status: 404 });
@@ -32,8 +33,9 @@ export async function GET(
 
 export async function PATCH(
   req: NextRequest,
-  { params }: { params: { id: string } },
+  { params }: { params: Promise<{ id: string }> },
 ) {
+  const { id } = await params;
   const supabase = createRouteHandlerClient({ cookies });
   const {
     data: { user },
@@ -48,7 +50,7 @@ export async function PATCH(
   }
 
   const existing = await prisma.document.findFirst({
-    where: { id: params.id, userId: user.id },
+    where: { id, userId: user.id },
   });
   if (!existing) {
     return NextResponse.json({ error: "not found" }, { status: 404 });
@@ -61,11 +63,11 @@ export async function PATCH(
   }
 
   const doc = await prisma.document.update({
-    where: { id: params.id },
+    where: { id },
     data: {
       title: parsed.data.title ?? existing.title,
       content: parsed.data.content ?? existing.content,
-      metadata: parsed.data.metadata ?? existing.metadata,
+      metadata: (parsed.data.metadata ?? existing.metadata) || undefined,
       version: existing.version + 1,
     },
   });
@@ -75,8 +77,9 @@ export async function PATCH(
 
 export async function DELETE(
   req: NextRequest,
-  { params }: { params: { id: string } },
+  { params }: { params: Promise<{ id: string }> },
 ) {
+  const { id } = await params;
   const supabase = createRouteHandlerClient({ cookies });
   const {
     data: { user },
@@ -85,12 +88,12 @@ export async function DELETE(
   await ensureUser(user.id, user.email ?? undefined);
 
   const existing = await prisma.document.findFirst({
-    where: { id: params.id, userId: user.id },
+    where: { id, userId: user.id },
   });
   if (!existing) {
     return NextResponse.json({ error: "not found" }, { status: 404 });
   }
 
-  await prisma.document.delete({ where: { id: params.id } });
+  await prisma.document.delete({ where: { id } });
   return NextResponse.json({ ok: true });
 }

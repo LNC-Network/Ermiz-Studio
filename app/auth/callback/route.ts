@@ -12,10 +12,7 @@ export async function GET(req: NextRequest) {
   const redirectResponse = NextResponse.redirect(new URL(next, requestUrl.origin), { status: 303 });
 
   if (code) {
-    const cookieStore = await cookies();
-    const supabase = createRouteHandlerClient({
-      cookies: () => cookieStore,
-    });
+    const supabase = createRouteHandlerClient({ cookies });
 
     const { error } = await supabase.auth.exchangeCodeForSession(code);
     if (error) {

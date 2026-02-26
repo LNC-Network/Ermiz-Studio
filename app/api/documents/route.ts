@@ -137,12 +137,10 @@ export async function POST(req: NextRequest) {
         userId: user.id,
         tab: parsed.data.tab,
         title: parsed.data.title,
-        content: parsed.data.content,
-        metadata: parsed.data.metadata,
+        content: parsed.data.content as any,
+        metadata: parsed.data.metadata as any,
         version: 1,
-        documentSet: parsed.data.documentSetId
-          ? { connect: { id: parsed.data.documentSetId } }
-          : undefined,
+        documentSetId: parsed.data.documentSetId,
       },
     });
 
