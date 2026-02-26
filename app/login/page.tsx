@@ -1,10 +1,10 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import { supabaseClient } from "@/lib/supabase/client";
 
-export default function LoginPage() {
+function LoginContent() {
   const searchParams = useSearchParams();
   const callbackUrl = searchParams.get("callbackUrl") ?? "/";
   const error = searchParams.get("error") ?? undefined;
@@ -44,5 +44,13 @@ export default function LoginPage() {
         {errorText && <p className="mt-4 text-sm text-red-400">{errorText}</p>}
       </div>
     </main>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense fallback={<div className="flex min-h-screen items-center justify-center bg-black text-white">Loading...</div>}>
+      <LoginContent />
+    </Suspense>
   );
 }

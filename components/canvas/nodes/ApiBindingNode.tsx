@@ -30,57 +30,57 @@ export const ApiBindingNode = memo(({ data, selected }: NodeProps) => {
         ? "#38bdf8"
         : isWebRtcProtocol
           ? "#f472b6"
-        : isGraphqlProtocol
-          ? "#c084fc"
-          : isGrpcProtocol
-            ? "#34d399"
-            : isSseProtocol
-              ? "#f59e0b"
-              : isWebhookProtocol
-                ? "#fb7185"
-                : "#60a5fa";
+          : isGraphqlProtocol
+            ? "#c084fc"
+            : isGrpcProtocol
+              ? "#34d399"
+              : isSseProtocol
+                ? "#f59e0b"
+                : isWebhookProtocol
+                  ? "#fb7185"
+                  : "#60a5fa";
   const instanceConfig = apiData.instance?.config as
     | {
-        endpoint?: string;
-        pingIntervalSec?: number;
-        pingTimeoutSec?: number;
-        maxMessageSizeKb?: number;
-        maxConnections?: number;
-        namespaces?: string[];
-        rooms?: string[];
-        events?: string[];
-        ackTimeoutMs?: number;
-        signalingTransportRef?: string;
-        stunServers?: string[];
-        turnServers?: string[];
-        peerLimit?: number;
-        topology?: string;
-        schemaSDL?: string;
-        operations?: {
-          queries?: boolean;
-          mutations?: boolean;
-          subscriptions?: boolean;
-        };
-        protobufDefinition?: string;
-        service?: string;
-        rpcMethods?: Array<{ name?: string; type?: string }>;
-        eventName?: string;
-        retryMs?: number;
-        heartbeatSec?: number;
-        direction?: string;
-        signatureVerification?: {
-          enabled?: boolean;
-          headerName?: string;
-          secretRef?: string;
-        };
-        retryPolicy?: {
-          enabled?: boolean;
-          maxAttempts?: number;
-          backoff?: string;
-        };
-        auth?: { type?: string };
-        rateLimit?: { enabled?: boolean; requests?: number; window?: string };
-      }
+      endpoint?: string;
+      pingIntervalSec?: number;
+      pingTimeoutSec?: number;
+      maxMessageSizeKb?: number;
+      maxConnections?: number;
+      namespaces?: string[];
+      rooms?: string[];
+      events?: string[];
+      ackTimeoutMs?: number;
+      signalingTransportRef?: string;
+      stunServers?: string[];
+      turnServers?: string[];
+      peerLimit?: number;
+      topology?: string;
+      schemaSDL?: string;
+      operations?: {
+        queries?: boolean;
+        mutations?: boolean;
+        subscriptions?: boolean;
+      };
+      protobufDefinition?: string;
+      service?: string;
+      rpcMethods?: Array<{ name?: string; type?: string }>;
+      eventName?: string;
+      retryMs?: number;
+      heartbeatSec?: number;
+      direction?: string;
+      signatureVerification?: {
+        enabled?: boolean;
+        headerName?: string;
+        secretRef?: string;
+      };
+      retryPolicy?: {
+        enabled?: boolean;
+        maxAttempts?: number;
+        backoff?: string;
+      };
+      auth?: { type?: string };
+      rateLimit?: { enabled?: boolean; requests?: number; window?: string };
+    }
     | undefined;
 
   const securityIcons: Record<string, string> = {
@@ -304,48 +304,31 @@ export const ApiBindingNode = memo(({ data, selected }: NodeProps) => {
 
       {/* REST Response Section */}
       {isRestProtocol &&
-        (apiData.responses?.success?.schema?.length > 0 ||
-        apiData.responses?.error?.schema?.length > 0) && (
-        <div
-          style={{
-            padding: "8px 12px",
-            borderBottom: "1px solid var(--border)",
-          }}
-        >
+        ((apiData.responses?.success?.schema?.length ?? 0) > 0 ||
+          (apiData.responses?.error?.schema?.length ?? 0) > 0) && (
           <div
             style={{
-              fontSize: 10,
-              color: "var(--muted)",
-              marginBottom: 6,
-              textTransform: "uppercase",
+              padding: "8px 12px",
+              borderBottom: "1px solid var(--border)",
             }}
           >
-            Response
-          </div>
-
-          <div style={{ display: "flex", gap: 12 }}>
-            <div>
-              <span style={{ fontSize: 9, color: "#4ade80" }}>
-                {apiData.responses?.success?.statusCode}
-              </span>
-              {(apiData.responses?.success?.schema || []).map(
-                (f: OutputField, i: number) => (
-                  <div
-                    key={i}
-                    style={{ fontSize: 10, color: "var(--secondary)" }}
-                  >
-                    {f.name}
-                  </div>
-                ),
-              )}
+            <div
+              style={{
+                fontSize: 10,
+                color: "var(--muted)",
+                marginBottom: 6,
+                textTransform: "uppercase",
+              }}
+            >
+              Response
             </div>
 
-            {(apiData.responses?.error?.schema?.length || 0) > 0 && (
+            <div style={{ display: "flex", gap: 12 }}>
               <div>
-                <span style={{ fontSize: 9, color: "#ef4444" }}>
-                  {apiData.responses?.error?.statusCode}
+                <span style={{ fontSize: 9, color: "#4ade80" }}>
+                  {apiData.responses?.success?.statusCode}
                 </span>
-                {(apiData.responses?.error?.schema || []).map(
+                {(apiData.responses?.success?.schema || []).map(
                   (f: OutputField, i: number) => (
                     <div
                       key={i}
@@ -356,10 +339,27 @@ export const ApiBindingNode = memo(({ data, selected }: NodeProps) => {
                   ),
                 )}
               </div>
-            )}
+
+              {(apiData.responses?.error?.schema?.length || 0) > 0 && (
+                <div>
+                  <span style={{ fontSize: 9, color: "#ef4444" }}>
+                    {apiData.responses?.error?.statusCode}
+                  </span>
+                  {(apiData.responses?.error?.schema || []).map(
+                    (f: OutputField, i: number) => (
+                      <div
+                        key={i}
+                        style={{ fontSize: 10, color: "var(--secondary)" }}
+                      >
+                        {f.name}
+                      </div>
+                    ),
+                  )}
+                </div>
+              )}
+            </div>
           </div>
-        </div>
-      )}
+        )}
 
       {/* Protocol Config Summary */}
       {!isRestProtocol && (

@@ -1,14 +1,14 @@
 import React, { memo } from "react";
 import { Handle, Position, NodeProps } from "@xyflow/react";
 import { BaseNode } from "./BaseNode";
-import { ProcessNode as ProcessNodeType } from "@/lib/schema/node";
+import { NodeData } from "@/lib/schema/node";
 
 export const TriggerNode = memo(
-  ({ data, selected }: NodeProps<ProcessNodeType>) => {
-    const isTrigger = data.type === "trigger";
-    const config = isTrigger ? data.config : { method: "GET", route: "/" };
-    const method = config.method || "GET";
-    const route = config.route || "/";
+  ({ data, selected }: NodeProps) => {
+    const nodeData = data as unknown as NodeData;
+    const isApiBinding = nodeData.kind === "api_binding";
+    const method = (isApiBinding ? nodeData.method : undefined) || "GET";
+    const route = (isApiBinding ? nodeData.route : undefined) || "/";
 
     const methodColor =
       method === "GET" ? "#60a5fa" : method === "POST" ? "#4ade80" : "#fb923c";
@@ -17,11 +17,11 @@ export const TriggerNode = memo(
       <BaseNode
         selected={!!selected}
         type="TRIGGER"
-        label={data.label}
-        className={isTrigger ? "trigger-accent" : ""}
+        label={nodeData.label}
+        className={isApiBinding ? "trigger-accent" : ""}
       >
         <div className="relative" style={{ minHeight: 40 }}>
-          {isTrigger && (
+          {isApiBinding && (
             <div
               style={{
                 display: "flex",
@@ -54,7 +54,7 @@ export const TriggerNode = memo(
           <div
             style={{ fontSize: 10, color: "var(--muted)", padding: "0 4px" }}
           >
-            {data.description || "API Entry Point"}
+            {nodeData.description || "API Entry Point"}
           </div>
 
           {/* Output Handle (Right) Only */}

@@ -403,8 +403,8 @@ export function PropertyInspector({ width = 320 }: { width?: number }) {
   const importedFunctionIds =
     kind === "process" && activeTab === "api"
       ? (nodeData as ProcessDefinition).steps
-          .filter((step) => step.kind === "ref" && Boolean(step.ref))
-          .map((step) => step.ref as string)
+        .filter((step) => step.kind === "ref" && Boolean(step.ref))
+        .map((step) => step.ref as string)
       : [];
   const allApiIds = Object.values(graphs)
     .flatMap((graph) => graph.nodes || [])
@@ -440,13 +440,13 @@ export function PropertyInspector({ width = 320 }: { width?: number }) {
   const dbConnectionSummary =
     kind === "database"
       ? analyzeDBConnections({
-          nodes: nodes as Array<{
-            id: string;
-            type?: string;
-            data?: Record<string, unknown>;
-          }>,
-          edges: edges as Array<{ source: string; target: string }>,
-        })[selectedNode.id] || null
+        nodes: nodes as Array<{
+          id: string;
+          type?: string;
+          data?: Record<string, unknown>;
+        }>,
+        edges: edges as Array<{ source: string; target: string }>,
+      })[selectedNode.id] || null
       : null;
 
   const updateDatabaseTables = (
@@ -628,8 +628,8 @@ export function PropertyInspector({ width = 320 }: { width?: number }) {
             },
             performanceTier:
               envRecord.performanceTier === "small" ||
-              envRecord.performanceTier === "medium" ||
-              envRecord.performanceTier === "large"
+                envRecord.performanceTier === "medium" ||
+                envRecord.performanceTier === "large"
                 ? envRecord.performanceTier
                 : fallback.performanceTier,
             overrides:
@@ -2613,34 +2613,34 @@ export function PropertyInspector({ width = 320 }: { width?: number }) {
                 const instanceDefaults =
                   nextProtocol === "ws"
                     ? {
-                        protocol: "ws" as const,
+                      protocol: "ws" as const,
+                      config: {
+                        endpoint: "/ws/events",
+                        pingIntervalSec: 20,
+                        pingTimeoutSec: 10,
+                        maxMessageSizeKb: 256,
+                        maxConnections: 5000,
+                        auth: { type: "none" as const, scopes: [] as string[] },
+                        rateLimit: {
+                          enabled: false,
+                          requests: 100,
+                          window: "minute" as const,
+                        },
+                      },
+                    }
+                    : nextProtocol === "socket.io"
+                      ? {
+                        protocol: "socket.io" as const,
                         config: {
-                          endpoint: "/ws/events",
-                          pingIntervalSec: 20,
-                          pingTimeoutSec: 10,
-                          maxMessageSizeKb: 256,
-                          maxConnections: 5000,
+                          endpoint: "/socket.io",
+                          namespaces: ["/"],
+                          rooms: [],
+                          events: [],
+                          ackTimeoutMs: 5000,
                           auth: { type: "none" as const, scopes: [] as string[] },
                           rateLimit: {
                             enabled: false,
                             requests: 100,
-                            window: "minute" as const,
-                          },
-                        },
-                      }
-                    : nextProtocol === "socket.io"
-                      ? {
-                          protocol: "socket.io" as const,
-                          config: {
-                            endpoint: "/socket.io",
-                            namespaces: ["/"],
-                            rooms: [],
-                            events: [],
-                            ackTimeoutMs: 5000,
-                            auth: { type: "none" as const, scopes: [] as string[] },
-                            rateLimit: {
-                              enabled: false,
-                              requests: 100,
                             window: "minute" as const,
                           },
                         },
@@ -2658,62 +2658,62 @@ export function PropertyInspector({ width = 320 }: { width?: number }) {
                         }
                         : nextProtocol === "graphql"
                           ? {
-                              protocol: "graphql" as const,
-                              config: {
-                                endpoint: "/graphql",
-                                schemaSDL: "type Query { health: String! }",
-                                operations: {
-                                  queries: true,
-                                  mutations: true,
-                                  subscriptions: true,
-                                },
+                            protocol: "graphql" as const,
+                            config: {
+                              endpoint: "/graphql",
+                              schemaSDL: "type Query { health: String! }",
+                              operations: {
+                                queries: true,
+                                mutations: true,
+                                subscriptions: true,
                               },
-                            }
+                            },
+                          }
                           : nextProtocol === "grpc"
                             ? {
-                                protocol: "grpc" as const,
-                                config: {
-                                  protobufDefinition:
-                                    "syntax = \"proto3\";\nservice ApiService { rpc Execute (ExecuteRequest) returns (ExecuteResponse); }\nmessage ExecuteRequest { string id = 1; }\nmessage ExecuteResponse { string status = 1; }",
-                                  service: "ApiService",
-                                  rpcMethods: [{ name: "Execute", type: "unary" as const }],
-                                },
-                              }
+                              protocol: "grpc" as const,
+                              config: {
+                                protobufDefinition:
+                                  "syntax = \"proto3\";\nservice ApiService { rpc Execute (ExecuteRequest) returns (ExecuteResponse); }\nmessage ExecuteRequest { string id = 1; }\nmessage ExecuteResponse { string status = 1; }",
+                                service: "ApiService",
+                                rpcMethods: [{ name: "Execute", type: "unary" as const }],
+                              },
+                            }
                             : nextProtocol === "sse"
                               ? {
-                                  protocol: "sse" as const,
-                                  config: {
-                                    endpoint: "/events",
-                                    eventName: "update",
-                                    retryMs: 5000,
-                                    heartbeatSec: 30,
-                                    direction: "server_to_client" as const,
-                                  },
-                                }
+                                protocol: "sse" as const,
+                                config: {
+                                  endpoint: "/events",
+                                  eventName: "update",
+                                  retryMs: 5000,
+                                  heartbeatSec: 30,
+                                  direction: "server_to_client" as const,
+                                },
+                              }
                               : {
-                                  protocol: "webhook" as const,
-                                  config: {
-                                    endpoint: "/webhooks/incoming",
-                                    signatureVerification: {
-                                      enabled: true,
-                                      headerName: "X-Signature",
-                                      secretRef: "WEBHOOK_SECRET",
-                                    },
-                                    retryPolicy: {
-                                      enabled: true,
-                                      maxAttempts: 5,
-                                      backoff: "exponential" as const,
-                                    },
+                                protocol: "webhook" as const,
+                                config: {
+                                  endpoint: "/webhooks/incoming",
+                                  signatureVerification: {
+                                    enabled: true,
+                                    headerName: "X-Signature",
+                                    secretRef: "WEBHOOK_SECRET",
                                   },
-                                };
+                                  retryPolicy: {
+                                    enabled: true,
+                                    maxAttempts: 5,
+                                    backoff: "exponential" as const,
+                                  },
+                                },
+                              };
 
                 handleUpdate({
                   protocol: nextProtocol,
                   apiType:
                     nextProtocol === "ws" ||
-                    nextProtocol === "socket.io" ||
-                    nextProtocol === "webrtc" ||
-                    nextProtocol === "sse"
+                      nextProtocol === "socket.io" ||
+                      nextProtocol === "webrtc" ||
+                      nextProtocol === "sse"
                       ? "asyncapi"
                       : "openapi",
                   method: undefined,
@@ -3203,8 +3203,8 @@ export function PropertyInspector({ width = 320 }: { width?: number }) {
                                   const type = rawType || "unary";
                                   const normalizedType =
                                     type === "server_stream" ||
-                                    type === "client_stream" ||
-                                    type === "bidirectional_stream"
+                                      type === "client_stream" ||
+                                      type === "bidirectional_stream"
                                       ? type
                                       : "unary";
                                   return {
@@ -3401,65 +3401,65 @@ export function PropertyInspector({ width = 320 }: { width?: number }) {
                     {(apiNode?.instance?.config as {
                       signatureVerification?: { enabled?: boolean };
                     } | undefined)?.signatureVerification?.enabled && (
-                      <div style={{ display: "grid", gridTemplateColumns: "1fr", gap: 8 }}>
-                        <div>
-                          <div style={labelStyle}>Header Name</div>
-                          <input
-                            type="text"
-                            value={
-                              (apiNode?.instance?.config as {
-                                signatureVerification?: { headerName?: string };
-                              } | undefined)?.signatureVerification?.headerName || ""
-                            }
-                            onChange={(e) =>
-                              handleUpdate({
-                                instance: {
-                                  ...(apiNode?.instance as object),
-                                  config: {
-                                    ...(apiNode?.instance?.config as object),
-                                    signatureVerification: {
-                                      ...((apiNode?.instance?.config as {
-                                        signatureVerification?: object;
-                                      } | undefined)?.signatureVerification as object),
-                                      headerName: e.target.value,
+                        <div style={{ display: "grid", gridTemplateColumns: "1fr", gap: 8 }}>
+                          <div>
+                            <div style={labelStyle}>Header Name</div>
+                            <input
+                              type="text"
+                              value={
+                                (apiNode?.instance?.config as {
+                                  signatureVerification?: { headerName?: string };
+                                } | undefined)?.signatureVerification?.headerName || ""
+                              }
+                              onChange={(e) =>
+                                handleUpdate({
+                                  instance: {
+                                    ...(apiNode?.instance as object),
+                                    config: {
+                                      ...(apiNode?.instance?.config as object),
+                                      signatureVerification: {
+                                        ...((apiNode?.instance?.config as {
+                                          signatureVerification?: object;
+                                        } | undefined)?.signatureVerification as object),
+                                        headerName: e.target.value,
+                                      },
                                     },
                                   },
-                                },
-                              } as Partial<ApiBinding>)
-                            }
-                            style={inputStyle}
-                          />
-                        </div>
-                        <div>
-                          <div style={labelStyle}>Secret Ref</div>
-                          <input
-                            type="text"
-                            value={
-                              (apiNode?.instance?.config as {
-                                signatureVerification?: { secretRef?: string };
-                              } | undefined)?.signatureVerification?.secretRef || ""
-                            }
-                            onChange={(e) =>
-                              handleUpdate({
-                                instance: {
-                                  ...(apiNode?.instance as object),
-                                  config: {
-                                    ...(apiNode?.instance?.config as object),
-                                    signatureVerification: {
-                                      ...((apiNode?.instance?.config as {
-                                        signatureVerification?: object;
-                                      } | undefined)?.signatureVerification as object),
-                                      secretRef: e.target.value,
+                                } as Partial<ApiBinding>)
+                              }
+                              style={inputStyle}
+                            />
+                          </div>
+                          <div>
+                            <div style={labelStyle}>Secret Ref</div>
+                            <input
+                              type="text"
+                              value={
+                                (apiNode?.instance?.config as {
+                                  signatureVerification?: { secretRef?: string };
+                                } | undefined)?.signatureVerification?.secretRef || ""
+                              }
+                              onChange={(e) =>
+                                handleUpdate({
+                                  instance: {
+                                    ...(apiNode?.instance as object),
+                                    config: {
+                                      ...(apiNode?.instance?.config as object),
+                                      signatureVerification: {
+                                        ...((apiNode?.instance?.config as {
+                                          signatureVerification?: object;
+                                        } | undefined)?.signatureVerification as object),
+                                        secretRef: e.target.value,
+                                      },
                                     },
                                   },
-                                },
-                              } as Partial<ApiBinding>)
-                            }
-                            style={inputStyle}
-                          />
+                                } as Partial<ApiBinding>)
+                              }
+                              style={inputStyle}
+                            />
+                          </div>
                         </div>
-                      </div>
-                    )}
+                      )}
                   </div>
 
                   <div style={sectionStyle}>
@@ -3504,68 +3504,68 @@ export function PropertyInspector({ width = 320 }: { width?: number }) {
                     {(apiNode?.instance?.config as {
                       retryPolicy?: { enabled?: boolean };
                     } | undefined)?.retryPolicy?.enabled && (
-                      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
-                        <div>
-                          <div style={labelStyle}>Max Attempts</div>
-                          <input
-                            type="number"
-                            value={
-                              (apiNode?.instance?.config as {
-                                retryPolicy?: { maxAttempts?: number };
-                              } | undefined)?.retryPolicy?.maxAttempts || 5
-                            }
-                            onChange={(e) =>
-                              handleUpdate({
-                                instance: {
-                                  ...(apiNode?.instance as object),
-                                  config: {
-                                    ...(apiNode?.instance?.config as object),
-                                    retryPolicy: {
-                                      ...((apiNode?.instance?.config as {
-                                        retryPolicy?: object;
-                                      } | undefined)?.retryPolicy as object),
-                                      maxAttempts: Number(e.target.value || 5),
+                        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+                          <div>
+                            <div style={labelStyle}>Max Attempts</div>
+                            <input
+                              type="number"
+                              value={
+                                (apiNode?.instance?.config as {
+                                  retryPolicy?: { maxAttempts?: number };
+                                } | undefined)?.retryPolicy?.maxAttempts || 5
+                              }
+                              onChange={(e) =>
+                                handleUpdate({
+                                  instance: {
+                                    ...(apiNode?.instance as object),
+                                    config: {
+                                      ...(apiNode?.instance?.config as object),
+                                      retryPolicy: {
+                                        ...((apiNode?.instance?.config as {
+                                          retryPolicy?: object;
+                                        } | undefined)?.retryPolicy as object),
+                                        maxAttempts: Number(e.target.value || 5),
+                                      },
                                     },
                                   },
-                                },
-                              } as Partial<ApiBinding>)
-                            }
-                            style={inputStyle}
-                          />
-                        </div>
-                        <div>
-                          <div style={labelStyle}>Backoff</div>
-                          <select
-                            value={
-                              (apiNode?.instance?.config as {
-                                retryPolicy?: { backoff?: string };
-                              } | undefined)?.retryPolicy?.backoff || "exponential"
-                            }
-                            onChange={(e) =>
-                              handleUpdate({
-                                instance: {
-                                  ...(apiNode?.instance as object),
-                                  config: {
-                                    ...(apiNode?.instance?.config as object),
-                                    retryPolicy: {
-                                      ...((apiNode?.instance?.config as {
-                                        retryPolicy?: object;
-                                      } | undefined)?.retryPolicy as object),
-                                      backoff: e.target.value,
+                                } as Partial<ApiBinding>)
+                              }
+                              style={inputStyle}
+                            />
+                          </div>
+                          <div>
+                            <div style={labelStyle}>Backoff</div>
+                            <select
+                              value={
+                                (apiNode?.instance?.config as {
+                                  retryPolicy?: { backoff?: string };
+                                } | undefined)?.retryPolicy?.backoff || "exponential"
+                              }
+                              onChange={(e) =>
+                                handleUpdate({
+                                  instance: {
+                                    ...(apiNode?.instance as object),
+                                    config: {
+                                      ...(apiNode?.instance?.config as object),
+                                      retryPolicy: {
+                                        ...((apiNode?.instance?.config as {
+                                          retryPolicy?: object;
+                                        } | undefined)?.retryPolicy as object),
+                                        backoff: e.target.value,
+                                      },
                                     },
                                   },
-                                },
-                              } as Partial<ApiBinding>)
-                            }
-                            style={selectStyle}
-                          >
-                            <option value="fixed">Fixed</option>
-                            <option value="linear">Linear</option>
-                            <option value="exponential">Exponential</option>
-                          </select>
+                                } as Partial<ApiBinding>)
+                              }
+                              style={selectStyle}
+                            >
+                              <option value="fixed">Fixed</option>
+                              <option value="linear">Linear</option>
+                              <option value="exponential">Exponential</option>
+                            </select>
+                          </div>
                         </div>
-                      </div>
-                    )}
+                      )}
                   </div>
                 </>
               )}
@@ -3643,67 +3643,67 @@ export function PropertyInspector({ width = 320 }: { width?: number }) {
                 </label>
                 {(apiNode?.instance?.config as { rateLimit?: { enabled?: boolean } } | undefined)?.rateLimit
                   ?.enabled && (
-                  <div style={{ display: "flex", gap: 8 }}>
-                    <div style={{ flex: 1 }}>
-                      <div style={labelStyle}>Requests</div>
-                      <input
-                        type="number"
-                        value={
-                          (apiNode?.instance?.config as {
-                            rateLimit?: { requests?: number };
-                          } | undefined)?.rateLimit?.requests || 100
-                        }
-                        onChange={(e) =>
-                          handleUpdate({
-                            instance: {
-                              ...(apiNode?.instance as object),
-                              config: {
-                                ...(apiNode?.instance?.config as object),
-                                rateLimit: {
-                                  ...((apiNode?.instance?.config as { rateLimit?: object } | undefined)
-                                    ?.rateLimit as object),
-                                  requests: Number(e.target.value || 100),
+                    <div style={{ display: "flex", gap: 8 }}>
+                      <div style={{ flex: 1 }}>
+                        <div style={labelStyle}>Requests</div>
+                        <input
+                          type="number"
+                          value={
+                            (apiNode?.instance?.config as {
+                              rateLimit?: { requests?: number };
+                            } | undefined)?.rateLimit?.requests || 100
+                          }
+                          onChange={(e) =>
+                            handleUpdate({
+                              instance: {
+                                ...(apiNode?.instance as object),
+                                config: {
+                                  ...(apiNode?.instance?.config as object),
+                                  rateLimit: {
+                                    ...((apiNode?.instance?.config as { rateLimit?: object } | undefined)
+                                      ?.rateLimit as object),
+                                    requests: Number(e.target.value || 100),
+                                  },
                                 },
                               },
-                            },
-                          } as Partial<ApiBinding>)
-                        }
-                        style={inputStyle}
-                      />
-                    </div>
-                    <div style={{ flex: 1 }}>
-                      <div style={labelStyle}>Per</div>
-                      <select
-                        value={
-                          (apiNode?.instance?.config as {
-                            rateLimit?: { window?: string };
-                          } | undefined)?.rateLimit?.window || "minute"
-                        }
-                        onChange={(e) =>
-                          handleUpdate({
-                            instance: {
-                              ...(apiNode?.instance as object),
-                              config: {
-                                ...(apiNode?.instance?.config as object),
-                                rateLimit: {
-                                  ...((apiNode?.instance?.config as { rateLimit?: object } | undefined)
-                                    ?.rateLimit as object),
-                                  window: e.target.value,
+                            } as Partial<ApiBinding>)
+                          }
+                          style={inputStyle}
+                        />
+                      </div>
+                      <div style={{ flex: 1 }}>
+                        <div style={labelStyle}>Per</div>
+                        <select
+                          value={
+                            (apiNode?.instance?.config as {
+                              rateLimit?: { window?: string };
+                            } | undefined)?.rateLimit?.window || "minute"
+                          }
+                          onChange={(e) =>
+                            handleUpdate({
+                              instance: {
+                                ...(apiNode?.instance as object),
+                                config: {
+                                  ...(apiNode?.instance?.config as object),
+                                  rateLimit: {
+                                    ...((apiNode?.instance?.config as { rateLimit?: object } | undefined)
+                                      ?.rateLimit as object),
+                                    window: e.target.value,
+                                  },
                                 },
                               },
-                            },
-                          } as Partial<ApiBinding>)
-                        }
-                        style={selectStyle}
-                      >
-                        <option value="second">Second</option>
-                        <option value="minute">Minute</option>
-                        <option value="hour">Hour</option>
-                        <option value="day">Day</option>
-                      </select>
+                            } as Partial<ApiBinding>)
+                          }
+                          style={selectStyle}
+                        >
+                          <option value="second">Second</option>
+                          <option value="minute">Minute</option>
+                          <option value="hour">Hour</option>
+                          <option value="day">Day</option>
+                        </select>
+                      </div>
                     </div>
-                  </div>
-                )}
+                  )}
               </div>
             </>
           )}
@@ -3751,229 +3751,300 @@ export function PropertyInspector({ width = 320 }: { width?: number }) {
           {/* Security */}
           {isRestProtocol && (
             <div style={sectionStyle}>
-            <div style={labelStyle}>Security</div>
-            <select
-              value={(nodeData as ApiBinding).security?.type || "none"}
-              onChange={(e) =>
-                handleUpdate({
-                  security: {
-                    ...(nodeData as ApiBinding).security,
-                    type: e.target.value as
-                      | "none"
-                      | "api_key"
-                      | "bearer"
-                      | "oauth2"
-                      | "basic",
-                  },
-                } as Partial<ApiBinding>)
-              }
-              style={selectStyle}
-            >
-              <option value="none">🔓 None</option>
-              <option value="api_key">🔑 API Key</option>
-              <option value="bearer">🎫 Bearer Token</option>
-              <option value="oauth2">🔐 OAuth2</option>
-              <option value="basic">👤 Basic Auth</option>
-            </select>
-            {(nodeData as ApiBinding).security?.type === "api_key" && (
-              <div style={{ marginTop: 8 }}>
-                <div style={labelStyle}>Header Name</div>
-                <input
-                  type="text"
-                  value={(nodeData as ApiBinding).security?.headerName || ""}
-                  onChange={(e) =>
-                    handleUpdate({
-                      security: {
-                        ...(nodeData as ApiBinding).security,
-                        headerName: e.target.value,
-                      },
-                    } as Partial<ApiBinding>)
-                  }
-                  placeholder="X-API-Key"
-                  style={inputStyle}
-                />
-              </div>
-            )}
+              <div style={labelStyle}>Security</div>
+              <select
+                value={(nodeData as ApiBinding).security?.type || "none"}
+                onChange={(e) =>
+                  handleUpdate({
+                    security: {
+                      ...(nodeData as ApiBinding).security,
+                      type: e.target.value as
+                        | "none"
+                        | "api_key"
+                        | "bearer"
+                        | "oauth2"
+                        | "basic",
+                    },
+                  } as Partial<ApiBinding>)
+                }
+                style={selectStyle}
+              >
+                <option value="none">🔓 None</option>
+                <option value="api_key">🔑 API Key</option>
+                <option value="bearer">🎫 Bearer Token</option>
+                <option value="oauth2">🔐 OAuth2</option>
+                <option value="basic">👤 Basic Auth</option>
+              </select>
+              {(nodeData as ApiBinding).security?.type === "api_key" && (
+                <div style={{ marginTop: 8 }}>
+                  <div style={labelStyle}>Header Name</div>
+                  <input
+                    type="text"
+                    value={(nodeData as ApiBinding).security?.headerName || ""}
+                    onChange={(e) =>
+                      handleUpdate({
+                        security: {
+                          ...(nodeData as ApiBinding).security,
+                          headerName: e.target.value,
+                        },
+                      } as Partial<ApiBinding>)
+                    }
+                    placeholder="X-API-Key"
+                    style={inputStyle}
+                  />
+                </div>
+              )}
             </div>
           )}
 
           {/* Rate Limiting */}
           {isRestProtocol && (
             <div style={sectionStyle}>
-            <label
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: 8,
-                fontSize: 11,
-                color: "var(--secondary)",
-                marginBottom: 8,
-              }}
-            >
-              <input
-                type="checkbox"
-                checked={(nodeData as ApiBinding).rateLimit?.enabled || false}
-                onChange={(e) =>
-                  handleUpdate({
-                    rateLimit: {
-                      ...(nodeData as ApiBinding).rateLimit,
-                      enabled: e.target.checked,
-                    },
-                  } as Partial<ApiBinding>)
-                }
-                style={{ accentColor: "var(--primary)" }}
-              />
-              Enable Rate Limiting
-            </label>
-            {(nodeData as ApiBinding).rateLimit?.enabled && (
-              <div style={{ display: "flex", gap: 8 }}>
-                <div style={{ flex: 1 }}>
-                  <div style={labelStyle}>Requests</div>
-                  <input
-                    type="number"
-                    value={(nodeData as ApiBinding).rateLimit?.requests || 100}
-                    onChange={(e) =>
-                      handleUpdate({
-                        rateLimit: {
-                          ...(nodeData as ApiBinding).rateLimit,
-                          requests: parseInt(e.target.value) || 100,
-                        },
-                      } as Partial<ApiBinding>)
-                    }
-                    style={inputStyle}
-                  />
+              <label
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 8,
+                  fontSize: 11,
+                  color: "var(--secondary)",
+                  marginBottom: 8,
+                }}
+              >
+                <input
+                  type="checkbox"
+                  checked={(nodeData as ApiBinding).rateLimit?.enabled || false}
+                  onChange={(e) =>
+                    handleUpdate({
+                      rateLimit: {
+                        ...(nodeData as ApiBinding).rateLimit,
+                        enabled: e.target.checked,
+                      },
+                    } as Partial<ApiBinding>)
+                  }
+                  style={{ accentColor: "var(--primary)" }}
+                />
+                Enable Rate Limiting
+              </label>
+              {(nodeData as ApiBinding).rateLimit?.enabled && (
+                <div style={{ display: "flex", gap: 8 }}>
+                  <div style={{ flex: 1 }}>
+                    <div style={labelStyle}>Requests</div>
+                    <input
+                      type="number"
+                      value={(nodeData as ApiBinding).rateLimit?.requests || 100}
+                      onChange={(e) =>
+                        handleUpdate({
+                          rateLimit: {
+                            ...(nodeData as ApiBinding).rateLimit,
+                            requests: parseInt(e.target.value) || 100,
+                          },
+                        } as Partial<ApiBinding>)
+                      }
+                      style={inputStyle}
+                    />
+                  </div>
+                  <div style={{ flex: 1 }}>
+                    <div style={labelStyle}>Per</div>
+                    <select
+                      value={
+                        (nodeData as ApiBinding).rateLimit?.window || "minute"
+                      }
+                      onChange={(e) =>
+                        handleUpdate({
+                          rateLimit: {
+                            ...(nodeData as ApiBinding).rateLimit,
+                            window: e.target.value as
+                              | "second"
+                              | "minute"
+                              | "hour"
+                              | "day",
+                          },
+                        } as Partial<ApiBinding>)
+                      }
+                      style={selectStyle}
+                    >
+                      <option value="second">Second</option>
+                      <option value="minute">Minute</option>
+                      <option value="hour">Hour</option>
+                      <option value="day">Day</option>
+                    </select>
+                  </div>
                 </div>
-                <div style={{ flex: 1 }}>
-                  <div style={labelStyle}>Per</div>
-                  <select
-                    value={
-                      (nodeData as ApiBinding).rateLimit?.window || "minute"
-                    }
-                    onChange={(e) =>
-                      handleUpdate({
-                        rateLimit: {
-                          ...(nodeData as ApiBinding).rateLimit,
-                          window: e.target.value as
-                            | "second"
-                            | "minute"
-                            | "hour"
-                            | "day",
-                        },
-                      } as Partial<ApiBinding>)
-                    }
-                    style={selectStyle}
-                  >
-                    <option value="second">Second</option>
-                    <option value="minute">Minute</option>
-                    <option value="hour">Hour</option>
-                    <option value="day">Day</option>
-                  </select>
-                </div>
-              </div>
-            )}
+              )}
             </div>
           )}
 
           {/* Request Schema Tabs */}
           {isRestProtocol && (
             <div style={sectionStyle}>
-            <div style={{ ...labelStyle, marginBottom: 8 }}>Request</div>
+              <div style={{ ...labelStyle, marginBottom: 8 }}>Request</div>
 
-            {/* Tab Buttons */}
-            <div style={{ display: "flex", gap: 2, marginBottom: 12 }}>
-              {(["body", "headers", "query"] as const).map((tab) => {
-                const showBody =
-                  isWsProtocol ||
-                  ["POST", "PUT", "PATCH"].includes(
-                    (nodeData as ApiBinding).method,
+              {/* Tab Buttons */}
+              <div style={{ display: "flex", gap: 2, marginBottom: 12 }}>
+                {(["body", "headers", "query"] as const).map((tab) => {
+                  const showBody =
+                    isWsProtocol ||
+                    ["POST", "PUT", "PATCH"].includes(
+                      (nodeData as ApiBinding).method || "",
+                    );
+                  if (tab === "body" && !showBody) return null;
+                  if (isWsProtocol && tab === "query") return null;
+
+                  const counts: Record<string, number> = {
+                    body:
+                      (nodeData as ApiBinding).request?.body?.schema?.length || 0,
+                    headers:
+                      (nodeData as ApiBinding).request?.headers?.length || 0,
+                    query:
+                      (nodeData as ApiBinding).request?.queryParams?.length || 0,
+                    path:
+                      (nodeData as ApiBinding).request?.pathParams?.length || 0,
+                  };
+
+                  return (
+                    <button
+                      key={tab}
+                      onClick={() => setRequestTab(tab)}
+                      style={{
+                        flex: 1,
+                        padding: "4px 8px",
+                        background:
+                          requestTab === tab ? "var(--floating)" : "transparent",
+                        border:
+                          requestTab === tab
+                            ? "1px solid var(--border)"
+                            : "1px solid transparent",
+                        borderRadius: 4,
+                        color:
+                          requestTab === tab
+                            ? "var(--secondary)"
+                            : "var(--muted)",
+                        fontSize: 10,
+                        cursor: "pointer",
+                        textTransform: "capitalize",
+                      }}
+                    >
+                      {tab}{" "}
+                      {counts[tab] > 0 && (
+                        <span style={{ color: "var(--primary)" }}>
+                          ({counts[tab]})
+                        </span>
+                      )}
+                    </button>
                   );
-                if (tab === "body" && !showBody) return null;
-                if (isWsProtocol && tab === "query") return null;
+                })}
+              </div>
 
-                const counts: Record<string, number> = {
-                  body:
-                    (nodeData as ApiBinding).request?.body?.schema?.length || 0,
-                  headers:
-                    (nodeData as ApiBinding).request?.headers?.length || 0,
-                  query:
-                    (nodeData as ApiBinding).request?.queryParams?.length || 0,
-                  path:
-                    (nodeData as ApiBinding).request?.pathParams?.length || 0,
-                };
-
-                return (
-                  <button
-                    key={tab}
-                    onClick={() => setRequestTab(tab)}
-                    style={{
-                      flex: 1,
-                      padding: "4px 8px",
-                      background:
-                        requestTab === tab ? "var(--floating)" : "transparent",
-                      border:
-                        requestTab === tab
-                          ? "1px solid var(--border)"
-                          : "1px solid transparent",
-                      borderRadius: 4,
-                      color:
-                        requestTab === tab
-                          ? "var(--secondary)"
-                          : "var(--muted)",
-                      fontSize: 10,
-                      cursor: "pointer",
-                      textTransform: "capitalize",
-                    }}
-                  >
-                    {tab}{" "}
-                    {counts[tab] > 0 && (
-                      <span style={{ color: "var(--primary)" }}>
-                        ({counts[tab]})
-                      </span>
+              {/* Body Tab */}
+              {requestTab === "body" &&
+                (isWsProtocol ||
+                  ["POST", "PUT", "PATCH"].includes(
+                    (nodeData as ApiBinding).method || "",
+                  )) && (
+                  <>
+                    {((nodeData as ApiBinding).request?.body?.schema || []).map(
+                      (field, i) => (
+                        <TypeSchemaEditor
+                          key={i}
+                          field={field}
+                          onChange={(updated) => {
+                            const schema = [
+                              ...((nodeData as ApiBinding).request?.body
+                                ?.schema || []),
+                            ];
+                            schema[i] = updated as InputField;
+                            handleUpdate({
+                              request: {
+                                ...(nodeData as ApiBinding).request,
+                                body: {
+                                  ...(nodeData as ApiBinding).request?.body,
+                                  schema,
+                                },
+                              },
+                            } as Partial<ApiBinding>);
+                          }}
+                          onRemove={() => {
+                            const schema = (
+                              (nodeData as ApiBinding).request?.body?.schema || []
+                            ).filter((_, idx) => idx !== i);
+                            handleUpdate({
+                              request: {
+                                ...(nodeData as ApiBinding).request,
+                                body: {
+                                  ...(nodeData as ApiBinding).request?.body,
+                                  schema,
+                                },
+                              },
+                            } as Partial<ApiBinding>);
+                          }}
+                        />
+                      ),
                     )}
-                  </button>
-                );
-              })}
-            </div>
+                    <button
+                      onClick={() => {
+                        const schema = [
+                          ...((nodeData as ApiBinding).request?.body?.schema ||
+                            []),
+                          {
+                            name: "field",
+                            type: "string",
+                            required: true,
+                          } as InputField,
+                        ];
+                        handleUpdate({
+                          request: {
+                            ...(nodeData as ApiBinding).request,
+                            body: {
+                              ...(nodeData as ApiBinding).request?.body,
+                              schema,
+                            },
+                          },
+                        } as Partial<ApiBinding>);
+                      }}
+                      style={{
+                        width: "100%",
+                        padding: "6px",
+                        background: "transparent",
+                        border: "1px dashed var(--border)",
+                        borderRadius: 4,
+                        color: "var(--muted)",
+                        fontSize: 11,
+                        cursor: "pointer",
+                      }}
+                    >
+                      + Add Body Field
+                    </button>
+                  </>
+                )}
 
-            {/* Body Tab */}
-            {requestTab === "body" &&
-              (isWsProtocol ||
-                ["POST", "PUT", "PATCH"].includes(
-                  (nodeData as ApiBinding).method,
-                )) && (
+              {/* Headers Tab */}
+              {requestTab === "headers" && (
                 <>
-                  {((nodeData as ApiBinding).request?.body?.schema || []).map(
+                  {((nodeData as ApiBinding).request?.headers || []).map(
                     (field, i) => (
                       <TypeSchemaEditor
                         key={i}
                         field={field}
                         onChange={(updated) => {
-                          const schema = [
-                            ...((nodeData as ApiBinding).request?.body
-                              ?.schema || []),
+                          const headers = [
+                            ...((nodeData as ApiBinding).request?.headers || []),
                           ];
-                          schema[i] = updated as InputField;
+                          headers[i] = updated as InputField;
                           handleUpdate({
                             request: {
                               ...(nodeData as ApiBinding).request,
-                              body: {
-                                ...(nodeData as ApiBinding).request?.body,
-                                schema,
-                              },
+                              headers,
                             },
                           } as Partial<ApiBinding>);
                         }}
                         onRemove={() => {
-                          const schema = (
-                            (nodeData as ApiBinding).request?.body?.schema || []
+                          const headers = (
+                            (nodeData as ApiBinding).request?.headers || []
                           ).filter((_, idx) => idx !== i);
                           handleUpdate({
                             request: {
                               ...(nodeData as ApiBinding).request,
-                              body: {
-                                ...(nodeData as ApiBinding).request?.body,
-                                schema,
-                              },
+                              headers,
                             },
                           } as Partial<ApiBinding>);
                         }}
@@ -3982,22 +4053,83 @@ export function PropertyInspector({ width = 320 }: { width?: number }) {
                   )}
                   <button
                     onClick={() => {
-                      const schema = [
-                        ...((nodeData as ApiBinding).request?.body?.schema ||
-                          []),
+                      const headers = [
+                        ...((nodeData as ApiBinding).request?.headers || []),
                         {
-                          name: "field",
+                          name: "Authorization",
                           type: "string",
                           required: true,
                         } as InputField,
                       ];
                       handleUpdate({
+                        request: { ...(nodeData as ApiBinding).request, headers },
+                      } as Partial<ApiBinding>);
+                    }}
+                    style={{
+                      width: "100%",
+                      padding: "6px",
+                      background: "transparent",
+                      border: "1px dashed var(--border)",
+                      borderRadius: 4,
+                      color: "var(--muted)",
+                      fontSize: 11,
+                      cursor: "pointer",
+                    }}
+                  >
+                    + Add Header
+                  </button>
+                </>
+              )}
+
+              {/* Query Tab */}
+              {requestTab === "query" && !isWsProtocol && (
+                <>
+                  {((nodeData as ApiBinding).request?.queryParams || []).map(
+                    (field, i) => (
+                      <TypeSchemaEditor
+                        key={i}
+                        field={field}
+                        onChange={(updated) => {
+                          const queryParams = [
+                            ...((nodeData as ApiBinding).request?.queryParams ||
+                              []),
+                          ];
+                          queryParams[i] = updated as InputField;
+                          handleUpdate({
+                            request: {
+                              ...(nodeData as ApiBinding).request,
+                              queryParams,
+                            },
+                          } as Partial<ApiBinding>);
+                        }}
+                        onRemove={() => {
+                          const queryParams = (
+                            (nodeData as ApiBinding).request?.queryParams || []
+                          ).filter((_, idx) => idx !== i);
+                          handleUpdate({
+                            request: {
+                              ...(nodeData as ApiBinding).request,
+                              queryParams,
+                            },
+                          } as Partial<ApiBinding>);
+                        }}
+                      />
+                    ),
+                  )}
+                  <button
+                    onClick={() => {
+                      const queryParams = [
+                        ...((nodeData as ApiBinding).request?.queryParams || []),
+                        {
+                          name: "page",
+                          type: "number",
+                          required: false,
+                        } as InputField,
+                      ];
+                      handleUpdate({
                         request: {
                           ...(nodeData as ApiBinding).request,
-                          body: {
-                            ...(nodeData as ApiBinding).request?.body,
-                            schema,
-                          },
+                          queryParams,
                         },
                       } as Partial<ApiBinding>);
                     }}
@@ -4012,257 +4144,125 @@ export function PropertyInspector({ width = 320 }: { width?: number }) {
                       cursor: "pointer",
                     }}
                   >
-                    + Add Body Field
+                    + Add Query Param
                   </button>
                 </>
               )}
 
-            {/* Headers Tab */}
-            {requestTab === "headers" && (
-              <>
-                {((nodeData as ApiBinding).request?.headers || []).map(
-                  (field, i) => (
-                    <TypeSchemaEditor
-                      key={i}
-                      field={field}
-                      onChange={(updated) => {
-                        const headers = [
-                          ...((nodeData as ApiBinding).request?.headers || []),
-                        ];
-                        headers[i] = updated as InputField;
-                        handleUpdate({
-                          request: {
-                            ...(nodeData as ApiBinding).request,
-                            headers,
-                          },
-                        } as Partial<ApiBinding>);
-                      }}
-                      onRemove={() => {
-                        const headers = (
-                          (nodeData as ApiBinding).request?.headers || []
-                        ).filter((_, idx) => idx !== i);
-                        handleUpdate({
-                          request: {
-                            ...(nodeData as ApiBinding).request,
-                            headers,
-                          },
-                        } as Partial<ApiBinding>);
-                      }}
-                    />
-                  ),
-                )}
-                <button
-                  onClick={() => {
-                    const headers = [
-                      ...((nodeData as ApiBinding).request?.headers || []),
-                      {
-                        name: "Authorization",
-                        type: "string",
-                        required: true,
-                      } as InputField,
-                    ];
-                    handleUpdate({
-                      request: { ...(nodeData as ApiBinding).request, headers },
-                    } as Partial<ApiBinding>);
-                  }}
-                  style={{
-                    width: "100%",
-                    padding: "6px",
-                    background: "transparent",
-                    border: "1px dashed var(--border)",
-                    borderRadius: 4,
-                    color: "var(--muted)",
-                    fontSize: 11,
-                    cursor: "pointer",
-                  }}
-                >
-                  + Add Header
-                </button>
-              </>
-            )}
-
-            {/* Query Tab */}
-            {requestTab === "query" && !isWsProtocol && (
-              <>
-                {((nodeData as ApiBinding).request?.queryParams || []).map(
-                  (field, i) => (
-                    <TypeSchemaEditor
-                      key={i}
-                      field={field}
-                      onChange={(updated) => {
-                        const queryParams = [
-                          ...((nodeData as ApiBinding).request?.queryParams ||
-                            []),
-                        ];
-                        queryParams[i] = updated as InputField;
-                        handleUpdate({
-                          request: {
-                            ...(nodeData as ApiBinding).request,
-                            queryParams,
-                          },
-                        } as Partial<ApiBinding>);
-                      }}
-                      onRemove={() => {
-                        const queryParams = (
-                          (nodeData as ApiBinding).request?.queryParams || []
-                        ).filter((_, idx) => idx !== i);
-                        handleUpdate({
-                          request: {
-                            ...(nodeData as ApiBinding).request,
-                            queryParams,
-                          },
-                        } as Partial<ApiBinding>);
-                      }}
-                    />
-                  ),
-                )}
-                <button
-                  onClick={() => {
-                    const queryParams = [
-                      ...((nodeData as ApiBinding).request?.queryParams || []),
-                      {
-                        name: "page",
-                        type: "number",
-                        required: false,
-                      } as InputField,
-                    ];
-                    handleUpdate({
-                      request: {
-                        ...(nodeData as ApiBinding).request,
-                        queryParams,
-                      },
-                    } as Partial<ApiBinding>);
-                  }}
-                  style={{
-                    width: "100%",
-                    padding: "6px",
-                    background: "transparent",
-                    border: "1px dashed var(--border)",
-                    borderRadius: 4,
-                    color: "var(--muted)",
-                    fontSize: 11,
-                    cursor: "pointer",
-                  }}
-                >
-                  + Add Query Param
-                </button>
-              </>
-            )}
-
-            {/* Auto-detected Path Params from Route */}
-            {(() => {
-              const route = (nodeData as ApiBinding).route || "";
-              const pathParams = route.match(/:(\w+)/g)?.map(p => p.slice(1)) || [];
-              if (pathParams.length === 0) return null;
-              return (
-                <div style={{ marginTop: 8, padding: 8, background: "var(--background)", borderRadius: 4 }}>
-                  <div style={{ fontSize: 9, color: "var(--muted)", marginBottom: 6 }}>
-                    📍 Path Params (from route):
+              {/* Auto-detected Path Params from Route */}
+              {(() => {
+                const route = (nodeData as ApiBinding).route || "";
+                const pathParams = route.match(/:(\w+)/g)?.map(p => p.slice(1)) || [];
+                if (pathParams.length === 0) return null;
+                return (
+                  <div style={{ marginTop: 8, padding: 8, background: "var(--background)", borderRadius: 4 }}>
+                    <div style={{ fontSize: 9, color: "var(--muted)", marginBottom: 6 }}>
+                      📍 Path Params (from route):
+                    </div>
+                    <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
+                      {pathParams.map(param => (
+                        <span key={param} style={{ fontSize: 10, padding: "2px 6px", background: "var(--floating)", borderRadius: 3, color: "#facc15", fontFamily: "monospace" }}>
+                          :{param}
+                        </span>
+                      ))}
+                    </div>
                   </div>
-                  <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
-                    {pathParams.map(param => (
-                      <span key={param} style={{ fontSize: 10, padding: "2px 6px", background: "var(--floating)", borderRadius: 3, color: "#facc15", fontFamily: "monospace" }}>
-                        :{param}
-                      </span>
-                    ))}
-                  </div>
-                </div>
-              );
-            })()}
+                );
+              })()}
             </div>
           )}
 
           {/* Response Success Schema */}
           {isRestProtocol && (
             <div style={sectionStyle}>
-            <div
-              style={{
-                ...labelStyle,
-                display: "flex",
-                justifyContent: "space-between",
-                alignItems: "center",
-                marginBottom: 8,
-              }}
-            >
-              <span style={{ color: "#4ade80" }}>Response Schema</span>
-              <span style={{ color: "var(--secondary)" }}>
-                {(nodeData as ApiBinding).responses?.success?.schema?.length ||
-                  0}
-              </span>
-            </div>
-            {((nodeData as ApiBinding).responses?.success?.schema || []).map(
-              (field, i) => (
-                <TypeSchemaEditor
-                  key={i}
-                  field={field}
-                  onChange={(updated) => {
-                    const schema = [
-                      ...((nodeData as ApiBinding).responses?.success?.schema ||
-                        []),
-                    ];
-                    schema[i] = updated as OutputField;
-                    handleUpdate({
-                      responses: {
-                        ...(nodeData as ApiBinding).responses,
-                        success: {
-                          ...(nodeData as ApiBinding).responses?.success,
-                          schema,
+              <div
+                style={{
+                  ...labelStyle,
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                  marginBottom: 8,
+                }}
+              >
+                <span style={{ color: "#4ade80" }}>Response Schema</span>
+                <span style={{ color: "var(--secondary)" }}>
+                  {(nodeData as ApiBinding).responses?.success?.schema?.length ||
+                    0}
+                </span>
+              </div>
+              {((nodeData as ApiBinding).responses?.success?.schema || []).map(
+                (field, i) => (
+                  <TypeSchemaEditor
+                    key={i}
+                    field={field}
+                    onChange={(updated) => {
+                      const schema = [
+                        ...((nodeData as ApiBinding).responses?.success?.schema ||
+                          []),
+                      ];
+                      schema[i] = updated as OutputField;
+                      handleUpdate({
+                        responses: {
+                          ...(nodeData as ApiBinding).responses,
+                          success: {
+                            ...(nodeData as ApiBinding).responses?.success,
+                            schema,
+                          },
                         },
-                      },
-                    } as Partial<ApiBinding>);
-                  }}
-                  onRemove={() => {
-                    const schema = (
-                      (nodeData as ApiBinding).responses?.success?.schema || []
-                    ).filter((_, idx) => idx !== i);
-                    handleUpdate({
-                      responses: {
-                        ...(nodeData as ApiBinding).responses,
-                        success: {
-                          ...(nodeData as ApiBinding).responses?.success,
-                          schema,
+                      } as Partial<ApiBinding>);
+                    }}
+                    onRemove={() => {
+                      const schema = (
+                        (nodeData as ApiBinding).responses?.success?.schema || []
+                      ).filter((_, idx) => idx !== i);
+                      handleUpdate({
+                        responses: {
+                          ...(nodeData as ApiBinding).responses,
+                          success: {
+                            ...(nodeData as ApiBinding).responses?.success,
+                            schema,
+                          },
                         },
+                      } as Partial<ApiBinding>);
+                    }}
+                  />
+                ),
+              )}
+              <button
+                onClick={() => {
+                  const schema = [
+                    ...((nodeData as ApiBinding).responses?.success?.schema ||
+                      []),
+                    { name: "field", type: "string" } as OutputField,
+                  ];
+                  handleUpdate({
+                    responses: {
+                      ...(nodeData as ApiBinding).responses,
+                      success: {
+                        ...(nodeData as ApiBinding).responses?.success,
+                        schema,
                       },
-                    } as Partial<ApiBinding>);
-                  }}
-                />
-              ),
-            )}
-            <button
-              onClick={() => {
-                const schema = [
-                  ...((nodeData as ApiBinding).responses?.success?.schema ||
-                    []),
-                  { name: "field", type: "string" } as OutputField,
-                ];
-                handleUpdate({
-                  responses: {
-                    ...(nodeData as ApiBinding).responses,
-                    success: {
-                      ...(nodeData as ApiBinding).responses?.success,
-                      schema,
                     },
-                  },
-                } as Partial<ApiBinding>);
-              }}
-              style={{
-                width: "100%",
-                padding: "6px",
-                background: "transparent",
-                border: "1px dashed var(--border)",
-                borderRadius: 4,
-                color: "var(--muted)",
-                fontSize: 11,
-                cursor: "pointer",
-                marginTop: 4,
-              }}
-            >
-              + Add Field
-            </button>
-            <div style={{ fontSize: 9, color: "var(--muted)", marginTop: 8 }}>
-              💡 Error responses (400, 404, 500) are auto-generated based on
-              validation & database errors
-            </div>
+                  } as Partial<ApiBinding>);
+                }}
+                style={{
+                  width: "100%",
+                  padding: "6px",
+                  background: "transparent",
+                  border: "1px dashed var(--border)",
+                  borderRadius: 4,
+                  color: "var(--muted)",
+                  fontSize: 11,
+                  cursor: "pointer",
+                  marginTop: 4,
+                }}
+              >
+                + Add Field
+              </button>
+              <div style={{ fontSize: 9, color: "var(--muted)", marginTop: 8 }}>
+                💡 Error responses (400, 404, 500) are auto-generated based on
+                validation & database errors
+              </div>
             </div>
           )}
 
