@@ -1,8 +1,8 @@
 import { cookies } from "next/headers";
-import { createServerClient } from "@supabase/auth-helpers-nextjs";
+import { createClient } from "@supabase/supabase-js";
 import { SupabaseClient } from "@supabase/supabase-js";
 
-export function getSupabaseServerClient(): SupabaseClient {
+export async function getSupabaseServerClient(): Promise<SupabaseClient> {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
@@ -10,17 +10,11 @@ export function getSupabaseServerClient(): SupabaseClient {
     throw new Error("Supabase environment variables are not set");
   }
 
-  return createServerClient(supabaseUrl, supabaseKey, {
-    cookies: {
-      get(name) {
-        return cookies().get(name)?.value;
-      },
-      set(name, value, options) {
-        cookies().set({ name, value, ...options });
-      },
-      remove(name, options) {
-        cookies().set({ name, value: "", maxAge: 0, ...options });
-      },
+  const cookieStore = await cookies();
+  
+  return createClient(supabaseUrl, supabaseKey, {
+    auth: {
+      persistSession: false,
     },
   });
 }

@@ -20,7 +20,7 @@ import {
   ProcessStep,
 } from "@/lib/schema/node";
 
-type NodeKind =
+export type NodeKind =
   | "process"
   | "database"
   | "queue"
@@ -894,7 +894,7 @@ export const useStore = create<RFState>((set, get) => {
       const config = nodeConfigs[kind];
       const isApiKind = kind === "api_binding" || kind.startsWith("api_");
       let nodeData = { ...(config.data as object) } as NodeData;
-      const nextNodes = nodes.map((node) => ({ ...node, selected: false }));
+      const nextNodes: Node[] = nodes.map((node) => ({ ...node, selected: false }));
 
       if (activeTab === "api" && isApiKind && nodeData.kind === "api_binding") {
         const existingApiProcessNode = nextNodes.find((node) => {
@@ -911,7 +911,7 @@ export const useStore = create<RFState>((set, get) => {
           apiProcessId = existingProcessData.id;
         } else {
           apiProcessId = `api_function_${Date.now()}`;
-          const placeholderProcessNode: Node = {
+          const placeholderProcessNode = {
             id: `node-${Date.now() + 1}`,
             type: "process",
             position: { x: position.x + 320, y: position.y + 40 },
@@ -927,8 +927,7 @@ export const useStore = create<RFState>((set, get) => {
               outputs: { success: [], error: [] },
               steps: [],
             },
-            selected: false,
-          };
+          } as Node;
           nextNodes.push(placeholderProcessNode);
         }
 

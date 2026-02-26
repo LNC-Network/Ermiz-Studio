@@ -215,7 +215,7 @@ export const assertDatabaseState = async ({
     `FROM "${safeSchema}"."${safeTable}" ` +
     `WHERE ${whereParts.join(" AND ")}`;
 
-  const result = await prisma.$queryRawUnsafe<Array<{ count: number }>>(sql, ...values);
+  const result = (await prisma.$queryRawUnsafe(sql, ...values)) as Array<{ count: number }>;
   const count = Number(result[0]?.count ?? 0);
 
   if (exists) {
