@@ -18,6 +18,7 @@ export type WorkspaceGraphTab =
 
 type GraphNode = {
   id: string;
+  type?: string;
   data: NodeData;
 };
 

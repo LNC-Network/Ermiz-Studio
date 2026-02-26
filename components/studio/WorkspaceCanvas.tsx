@@ -4,7 +4,7 @@ import dynamic from "next/dynamic";
 import { PropertyInspector } from "@/components/panels/PropertyInspector";
 import { DatabaseSchemaDesigner } from "@/components/panels/DatabaseSchemaDesigner";
 import { DatabaseQueryBuilder } from "@/components/panels/DatabaseQueryBuilder";
-import { useStore } from "@/store/useStore";
+import { useStore, type NodeKind } from "@/store/useStore";
 
 const FlowCanvas = dynamic(() => import("@/components/canvas/FlowCanvas"), {
   ssr: false,
@@ -25,7 +25,7 @@ const clampInspectorWidth = (value: number) =>
   Math.max(260, Math.min(520, value || DEFAULT_INSPECTOR_WIDTH));
 
 export type SidebarItem = {
-  kind: Parameters<ReturnType<typeof useStore>["addNode"]>[0];
+  kind: NodeKind;
   label: string;
   icon: string;
   hoverColor: string;

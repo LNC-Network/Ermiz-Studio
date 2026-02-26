@@ -1,4 +1,5 @@
 import { prisma } from "./prisma";
+import type { Prisma } from "@prisma/client";
 
 const monthlyFreeCredits = Number(process.env.MONTHLY_FREE_CREDITS ?? 1000);
 const resetDay =
@@ -80,7 +81,7 @@ export async function requireCredits(userId: string, amount: number) {
     throw new Error("insufficient credits");
   }
 
-  const updated = await prisma.$transaction(async (tx) => {
+  const updated = await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
     const newBalance = await tx.creditBalance.update({
       where: { userId },
       data: { availableCredits: { decrement: amount } },
@@ -111,7 +112,7 @@ export async function addCredits(
     throw new Error("amount must be positive");
   }
 
-  const updated = await prisma.$transaction(async (tx) => {
+  const updated = await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
     const newBalance = await tx.creditBalance.upsert({
       where: { userId },
       create: {

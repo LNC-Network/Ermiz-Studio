@@ -228,6 +228,7 @@ export function DatabaseSchemaDesigner() {
   const addRelationship = () => {
     if (!activeDatabaseData || tables.length < 2) return;
     const [fromTable, toTable] = tables;
+    if (!fromTable.id || !toTable.id) return;
     const next: DatabaseRelationship = {
       id: `rel_${Date.now()}`,
       type: "one_to_many",
@@ -264,7 +265,9 @@ export function DatabaseSchemaDesigner() {
   const tableById = useMemo(() => {
     const map = new Map<string, DatabaseTable>();
     for (const table of tables) {
-      map.set(table.id, table);
+      if (table.id) {
+        map.set(table.id, table);
+      }
     }
     return map;
   }, [tables]);
@@ -337,7 +340,9 @@ export function DatabaseSchemaDesigner() {
   const pointByTableId = useMemo(() => {
     const map = new Map<string, { x: number; y: number }>();
     for (const node of graphLayout) {
-      map.set(node.id, { x: node.x, y: node.y });
+      if (node.id) {
+        map.set(node.id, { x: node.x, y: node.y });
+      }
     }
     return map;
   }, [graphLayout]);
@@ -405,7 +410,7 @@ export function DatabaseSchemaDesigner() {
 
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", minHeight: 0 }}>
           <div style={{ overflow: "auto", padding: 10, display: "grid", gap: 10 }}>
-            {tables.map((table) => (
+            {tables.filter((t) => t.id).map((table) => (
               <article
                 key={table.id}
                 style={{
@@ -421,19 +426,19 @@ export function DatabaseSchemaDesigner() {
                   <input
                     value={table.name}
                     onChange={(event) =>
-                      updateTable(table.id, { name: event.target.value || table.name })
+                      updateTable(table.id!, { name: event.target.value || table.name })
                     }
                     style={{ ...inputStyle, flex: 1 }}
                   />
                   <button
                     type="button"
                     style={smallButton}
-                    onClick={() => removeTable(table.id)}
+                    onClick={() => removeTable(table.id!)}
                   >
                     Remove
                   </button>
                 </div>
-                {table.fields.map((field) => (
+                {table.fields.filter((f) => f.id).map((field) => (
                   <div
                     key={field.id}
                     style={{
@@ -449,14 +454,14 @@ export function DatabaseSchemaDesigner() {
                       <input
                         value={field.name}
                         onChange={(event) =>
-                          updateField(table.id, field.id, { name: event.target.value })
+                          updateField(table.id!, field.id!, { name: event.target.value })
                         }
                         style={inputStyle}
                       />
                       <select
                         value={field.type}
                         onChange={(event) =>
-                          updateField(table.id, field.id, {
+                          updateField(table.id!, field.id!, {
                             type: event.target.value as DatabaseFieldType,
                           })
                         }
@@ -471,7 +476,7 @@ export function DatabaseSchemaDesigner() {
                       <button
                         type="button"
                         style={smallButton}
-                        onClick={() => removeField(table.id, field.id)}
+                        onClick={() => removeField(table.id!, field.id!)}
                       >
                         x
                       </button>
@@ -479,7 +484,7 @@ export function DatabaseSchemaDesigner() {
                     <input
                       value={field.defaultValue || ""}
                       onChange={(event) =>
-                        updateField(table.id, field.id, {
+                        updateField(table.id!, field.id!, {
                           defaultValue: event.target.value || undefined,
                         })
                       }
@@ -506,7 +511,7 @@ export function DatabaseSchemaDesigner() {
                             type="checkbox"
                             checked={Boolean(field[option.key as keyof DatabaseTableField])}
                             onChange={(event) =>
-                              updateField(table.id, field.id, {
+                              updateField(table.id!, field.id!, {
                                 [option.key]: event.target.checked,
                               } as Partial<DatabaseTableField>)
                             }
@@ -517,7 +522,7 @@ export function DatabaseSchemaDesigner() {
                     </div>
                   </div>
                 ))}
-                <button type="button" style={smallButton} onClick={() => addField(table.id)}>
+                <button type="button" style={smallButton} onClick={() => addField(table.id!)}>
                   + Field
                 </button>
               </article>
